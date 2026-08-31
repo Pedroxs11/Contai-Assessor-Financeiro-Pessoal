@@ -1,6 +1,7 @@
 package com.contai.financeiro
 
 import android.content.Context
+import android.content.ComponentName
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 
@@ -13,6 +14,7 @@ class FinanceNotificationListener : NotificationListenerService() {
         super.onListenerConnected()
 
         prefs().edit()
+            .putBoolean("service_connected", true)
             .putString("last_package", "SISTEMA CONTAI")
             .putString("last_title", "Serviço conectado")
             .putString(
@@ -20,6 +22,18 @@ class FinanceNotificationListener : NotificationListenerService() {
                 "O Android conectou o Contai ao serviço de notificações."
             )
             .apply()
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+
+        prefs().edit()
+            .putBoolean("service_connected", false)
+            .apply()
+
+        NotificationListenerService.requestRebind(
+            ComponentName(this, FinanceNotificationListener::class.java)
+        )
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -46,6 +60,14 @@ class FinanceNotificationListener : NotificationListenerService() {
         ).firstOrNull { it.isNotBlank() }.orEmpty()
 
         val parsed = FinancialParser.parse(title, text)
+
+        val isLikelyFinancial =
+            parsed.amount != null ||
+            parsed.type != "NAO_IDENTIFICADO"
+
+        if (!isLikelyFinancial) {
+            return
+        }
 
         val editor = prefs().edit()
             .putString("last_package", sbn?.packageName.orEmpty())

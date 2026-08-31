@@ -1,9 +1,11 @@
 package com.contai.financeiro
 
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -35,6 +37,7 @@ fun ContaiApp() {
     var lastType by remember { mutableStateOf("") }
     var lastConfidence by remember { mutableStateOf(0) }
     var notificationAccess by remember { mutableStateOf(false) }
+    var serviceConnected by remember { mutableStateOf(false) }
 
     fun refreshData() {
         val prefs = context.getSharedPreferences(
@@ -48,6 +51,7 @@ fun ContaiApp() {
         lastAmount = prefs.getString("last_amount", "") ?: ""
         lastType = prefs.getString("last_type", "") ?: ""
         lastConfidence = prefs.getInt("last_confidence", 0)
+        serviceConnected = prefs.getBoolean("service_connected", false)
 
         val enabledListeners =
             Settings.Secure.getString(
@@ -93,6 +97,17 @@ fun ContaiApp() {
                     style = MaterialTheme.typography.titleMedium
                 )
 
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = if (serviceConnected) {
+                        "Serviço de captura: CONECTADO"
+                    } else {
+                        "Serviço de captura: DESCONECTADO"
+                    },
+                    style = MaterialTheme.typography.titleMedium
+                )
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
@@ -104,6 +119,22 @@ fun ContaiApp() {
                     }
                 ) {
                     Text("Abrir acesso às notificações")
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        NotificationListenerService.requestRebind(
+                            ComponentName(
+                                context,
+                                FinanceNotificationListener::class.java
+                            )
+                        )
+                        refreshData()
+                    }
+                ) {
+                    Text("Reconectar captura")
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
