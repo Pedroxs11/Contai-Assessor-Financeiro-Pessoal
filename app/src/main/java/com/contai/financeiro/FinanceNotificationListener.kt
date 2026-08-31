@@ -59,7 +59,14 @@ class FinanceNotificationListener : NotificationListenerService() {
             notification.tickerText?.toString().orEmpty()
         ).firstOrNull { it.isNotBlank() }.orEmpty()
 
-        val parsed = FinancialParser.parse(title, text)
+        prefs().edit()
+            .putLong("debug_last_event_at", System.currentTimeMillis())
+            .putString("debug_last_package", sbn?.packageName.orEmpty())
+            .putString("debug_last_title", title)
+            .putString("debug_last_text", text)
+            .apply()
+
+        val parsed = FinancialParser.parse(sbn?.packageName.orEmpty(), title, text)
 
         if (parsed.classification == "NAO_FINANCEIRA") {
             return

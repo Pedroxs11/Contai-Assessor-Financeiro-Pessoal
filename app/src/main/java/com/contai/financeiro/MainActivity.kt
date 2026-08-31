@@ -42,6 +42,9 @@ fun ContaiApp() {
     var lastClassification by remember { mutableStateOf("") }
     var notificationAccess by remember { mutableStateOf(false) }
     var serviceConnected by remember { mutableStateOf(false) }
+    var debugLastEventAt by remember { mutableStateOf(0L) }
+    var debugLastPackage by remember { mutableStateOf("") }
+    var debugLastTitle by remember { mutableStateOf("") }
 
     fun refreshData() {
         val prefs = context.getSharedPreferences(
@@ -57,6 +60,9 @@ fun ContaiApp() {
         lastConfidence = prefs.getInt("last_confidence", 0)
         lastClassification = prefs.getString("last_classification", "") ?: ""
         serviceConnected = prefs.getBoolean("service_connected", false)
+        debugLastEventAt = prefs.getLong("debug_last_event_at", 0L)
+        debugLastPackage = prefs.getString("debug_last_package", "") ?: ""
+        debugLastTitle = prefs.getString("debug_last_title", "") ?: ""
 
         val enabledListeners =
             Settings.Secure.getString(
@@ -69,6 +75,14 @@ fun ContaiApp() {
     }
 
     LaunchedEffect(Unit) {
+        NotificationListenerService.requestRebind(
+            ComponentName(
+                context,
+                FinanceNotificationListener::class.java
+            )
+        )
+
+        delay(2500)
         refreshData()
     }
 
@@ -112,6 +126,13 @@ fun ContaiApp() {
                     },
                     style = MaterialTheme.typography.titleMedium
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text("Diagnóstico do listener")
+                Text("Último app recebido: ${debugLastPackage.ifBlank { "nenhum" }}")
+                Text("Último título recebido: ${debugLastTitle.ifBlank { "nenhum" }}")
+                Text("Último evento: ${if (debugLastEventAt > 0L) debugLastEventAt.toString() else "nenhum"}")
 
                 Spacer(modifier = Modifier.height(16.dp))
 

@@ -13,7 +13,7 @@ object FinancialParser {
     private val amountRegex =
         Regex("""R\$\s*([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2})""")
 
-    fun parse(title: String, text: String): ParsedTransaction {
+    fun parse(packageName: String, title: String, text: String): ParsedTransaction {
         val content = "$title $text".trim()
 
         val amount = amountRegex
@@ -25,6 +25,25 @@ object FinancialParser {
             ?.toDoubleOrNull()
 
         val lower = content.lowercase()
+        val packageLower = packageName.lowercase()
+
+        val trustedFinancialPackages = listOf(
+            "santander",
+            "nubank",
+            "itau",
+            "bradesco",
+            "inter",
+            "mercadopago",
+            "picpay",
+            "caixa",
+            "bb",
+            "bancodobrasil"
+        )
+
+        val isTrustedFinancialApp =
+            trustedFinancialPackages.any { packageLower.contains(it) }
+
+
 
         val expenseWords = listOf(
             "compra",
@@ -69,14 +88,17 @@ object FinancialParser {
         }
 
         val confidence = when {
-            amount != null && type != "NAO_IDENTIFICADO" -> 90
+            hasPromoWords -> 10
+            isTrustedFinancialApp && amount != null && type != "NAO_IDENTIFICADO" -> 95
+            amount != null && type != "NAO_IDENTIFICADO" -> 80
             amount != null -> 60
             else -> 20
         }
 
         val classification = when {
             hasPromoWords -> "NAO_FINANCEIRA"
-            amount != null && type != "NAO_IDENTIFICADO" -> "CONFIRMADA"
+            isTrustedFinancialApp && amount != null && type != "NAO_IDENTIFICADO" -> "CONFIRMADA"
+            amount != null && type != "NAO_IDENTIFICADO" -> "POSSIVEL"
             amount != null -> "POSSIVEL"
             else -> "NAO_FINANCEIRA"
         }
