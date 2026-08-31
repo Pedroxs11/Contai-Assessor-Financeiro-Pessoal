@@ -31,6 +31,9 @@ fun ContaiApp() {
     var lastPackage by remember { mutableStateOf("") }
     var lastTitle by remember { mutableStateOf("") }
     var lastText by remember { mutableStateOf("") }
+    var lastAmount by remember { mutableStateOf("") }
+    var lastType by remember { mutableStateOf("") }
+    var lastConfidence by remember { mutableStateOf(0) }
     var notificationAccess by remember { mutableStateOf(false) }
 
     fun refreshData() {
@@ -42,6 +45,9 @@ fun ContaiApp() {
         lastPackage = prefs.getString("last_package", "") ?: ""
         lastTitle = prefs.getString("last_title", "") ?: ""
         lastText = prefs.getString("last_text", "") ?: ""
+        lastAmount = prefs.getString("last_amount", "") ?: ""
+        lastType = prefs.getString("last_type", "") ?: ""
+        lastConfidence = prefs.getInt("last_confidence", 0)
 
         val enabledListeners =
             Settings.Secure.getString(
@@ -137,6 +143,14 @@ fun ContaiApp() {
                             Text("Título: $lastTitle")
                             Spacer(modifier = Modifier.height(6.dp))
                             Text("Texto: $lastText")
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("Valor: ${if (lastAmount.isBlank()) "não identificado" else "R$ " + lastAmount.replace(".", ",")}")
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text("Tipo: ${if (lastType.isBlank()) "Não identificado" else lastType}")
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text("Confiança: $lastConfidence%")
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text("Status: ${if (lastConfidence >= 90 && lastType != "NAO_IDENTIFICADO") "Identificado" else "Aguardando confirmação"}")
                         }
                     }
                 }

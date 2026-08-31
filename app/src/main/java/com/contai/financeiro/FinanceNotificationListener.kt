@@ -26,16 +26,40 @@ class FinanceNotificationListener : NotificationListenerService() {
         val notification = sbn?.notification ?: return
         val extras = notification.extras
 
-        val title =
-            extras.getCharSequence("android.title")?.toString().orEmpty()
+        val title = listOf(
+            extras.getCharSequence("android.title")?.toString().orEmpty(),
+            extras.getCharSequence("android.title.big")?.toString().orEmpty(),
+            extras.getCharSequence("android.subText")?.toString().orEmpty()
+        ).firstOrNull { it.isNotBlank() }.orEmpty()
 
-        val text =
-            extras.getCharSequence("android.text")?.toString().orEmpty()
+        val textLines =
+            extras.getCharSequenceArray("android.textLines")
+                ?.joinToString(" ")
+                .orEmpty()
 
-        prefs().edit()
-            .putString("last_package", sbn.packageName)
+        val text = listOf(
+            extras.getCharSequence("android.bigText")?.toString().orEmpty(),
+            extras.getCharSequence("android.text")?.toString().orEmpty(),
+            textLines,
+            extras.getCharSequence("android.subText")?.toString().orEmpty(),
+            notification.tickerText?.toString().orEmpty()
+        ).firstOrNull { it.isNotBlank() }.orEmpty()
+
+        val parsed = FinancialParser.parse(title, text)
+
+        val editor = prefs().edit()
+            .putString("last_package", sbn?.packageName.orEmpty())
             .putString("last_title", title)
             .putString("last_text", text)
-            .apply()
+            .putString("last_type", parsed.type)
+            .putInt("last_confidence", parsed.confidence)
+
+        if (parsed.amount != null) {
+            editor.putString("last_amount", parsed.amount.toString())
+        } else {
+            editor.remove("last_amount")
+        }
+
+        editor.apply()
     }
 }
