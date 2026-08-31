@@ -39,6 +39,7 @@ fun ContaiApp() {
     var lastAmount by remember { mutableStateOf("") }
     var lastType by remember { mutableStateOf("") }
     var lastConfidence by remember { mutableStateOf(0) }
+    var lastClassification by remember { mutableStateOf("") }
     var notificationAccess by remember { mutableStateOf(false) }
     var serviceConnected by remember { mutableStateOf(false) }
 
@@ -54,6 +55,7 @@ fun ContaiApp() {
         lastAmount = prefs.getString("last_amount", "") ?: ""
         lastType = prefs.getString("last_type", "") ?: ""
         lastConfidence = prefs.getInt("last_confidence", 0)
+        lastClassification = prefs.getString("last_classification", "") ?: ""
         serviceConnected = prefs.getBoolean("service_connected", false)
 
         val enabledListeners =
@@ -188,7 +190,11 @@ fun ContaiApp() {
                             Spacer(modifier = Modifier.height(6.dp))
                             Text("Confiança: $lastConfidence%")
                             Spacer(modifier = Modifier.height(6.dp))
-                            Text("Status: ${if (lastConfidence >= 90 && lastType != "NAO_IDENTIFICADO") "Identificado" else "Aguardando confirmação"}")
+                            Text("Status: ${when (lastClassification) {
+                                "CONFIRMADA" -> "Confirmada"
+                                "POSSIVEL" -> "Aguardando confirmação"
+                                else -> "Não financeira"
+                            }}")
                         }
                     }
                 }

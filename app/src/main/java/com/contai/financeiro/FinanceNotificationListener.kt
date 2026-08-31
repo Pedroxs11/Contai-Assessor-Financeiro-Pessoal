@@ -61,11 +61,7 @@ class FinanceNotificationListener : NotificationListenerService() {
 
         val parsed = FinancialParser.parse(title, text)
 
-        val isLikelyFinancial =
-            parsed.amount != null ||
-            parsed.type != "NAO_IDENTIFICADO"
-
-        if (!isLikelyFinancial) {
+        if (parsed.classification == "NAO_FINANCEIRA") {
             return
         }
 
@@ -75,6 +71,7 @@ class FinanceNotificationListener : NotificationListenerService() {
             .putString("last_text", text)
             .putString("last_type", parsed.type)
             .putInt("last_confidence", parsed.confidence)
+            .putString("last_classification", parsed.classification)
 
         if (parsed.amount != null) {
             editor.putString("last_amount", parsed.amount.toString())

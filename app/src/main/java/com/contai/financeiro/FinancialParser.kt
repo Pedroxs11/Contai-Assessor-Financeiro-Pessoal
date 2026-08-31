@@ -4,7 +4,8 @@ data class ParsedTransaction(
     val amount: Double?,
     val type: String,
     val description: String,
-    val confidence: Int
+    val confidence: Int,
+    val classification: String
 )
 
 object FinancialParser {
@@ -44,6 +45,23 @@ object FinancialParser {
             "credito recebido"
         )
 
+
+        val promoWords = listOf(
+            "promoção",
+            "promocao",
+            "oferta",
+            "desconto",
+            "cupom",
+            "compre aqui",
+            "até 3x",
+            "ate 3x",
+            "frete grátis",
+            "frete gratis"
+        )
+
+        val hasPromoWords =
+            promoWords.any { lower.contains(it) }
+
         val type = when {
             incomeWords.any { lower.contains(it) } -> "ENTRADA"
             expenseWords.any { lower.contains(it) } -> "DESPESA"
@@ -56,11 +74,19 @@ object FinancialParser {
             else -> 20
         }
 
+        val classification = when {
+            hasPromoWords -> "NAO_FINANCEIRA"
+            amount != null && type != "NAO_IDENTIFICADO" -> "CONFIRMADA"
+            amount != null -> "POSSIVEL"
+            else -> "NAO_FINANCEIRA"
+        }
+
         return ParsedTransaction(
             amount = amount,
             type = type,
             description = content,
-            confidence = confidence
+            confidence = confidence,
+            classification = classification
         )
     }
 }
