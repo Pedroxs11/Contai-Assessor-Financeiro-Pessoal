@@ -11,6 +11,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -29,6 +31,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun ContaiApp() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     var lastPackage by remember { mutableStateOf("") }
     var lastTitle by remember { mutableStateOf("") }
@@ -131,7 +134,11 @@ fun ContaiApp() {
                                 FinanceNotificationListener::class.java
                             )
                         )
-                        refreshData()
+
+                        scope.launch {
+                            delay(2500)
+                            refreshData()
+                        }
                     }
                 ) {
                     Text("Reconectar captura")
