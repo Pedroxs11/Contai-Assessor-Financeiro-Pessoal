@@ -30,6 +30,7 @@ object FinancialParser {
         val trustedFinancialPackages = listOf(
             "santander",
             "nubank",
+            "com.nu.production",
             "itau",
             "bradesco",
             "inter",
@@ -51,7 +52,10 @@ object FinancialParser {
             "debito",
             "gasto",
             "cobrança",
-            "cobranca"
+            "cobranca",
+            "pix enviado",
+            "transferência enviada",
+            "transferencia enviada"
         )
 
         val incomeWords = listOf(
@@ -60,7 +64,11 @@ object FinancialParser {
             "depósito",
             "deposito",
             "crédito recebido",
-            "credito recebido"
+            "credito recebido",
+            "transferência recebida",
+            "transferencia recebida",
+            "recebemos sua transferência",
+            "recebemos sua transferencia"
         )
 
 

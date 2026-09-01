@@ -59,6 +59,12 @@ fun ContaiApp() {
     var newCategoryName by remember { mutableStateOf("") }
     var selectedSection by remember { mutableStateOf("PENDENCIAS") }
 
+    var showManualEntryDialog by remember { mutableStateOf(false) }
+    var manualType by remember { mutableStateOf("DESPESA") }
+    var manualAmount by remember { mutableStateOf("") }
+    var manualCategory by remember { mutableStateOf("Outros") }
+    var manualDescription by remember { mutableStateOf("") }
+
     fun addCustomCategory(name: String, type: String) {
         val cleanName = name.trim()
         if (cleanName.isBlank()) return
@@ -186,6 +192,73 @@ fun ContaiApp() {
         serviceConnected &&
         listenerLastAliveAt > 0L &&
         System.currentTimeMillis() - listenerLastAliveAt <= 45_000
+
+    fun ignoreTransaction(timestamp: Long) {
+        val prefs = context.getSharedPreferences(
+            "contai_notifications",
+            Context.MODE_PRIVATE
+        )
+
+        val historyJson = JSONArray(
+            prefs.getString("transaction_history", "[]") ?: "[]"
+        )
+
+        for (i in 0 until historyJson.length()) {
+            val item = historyJson.getJSONObject(i)
+
+            if (item.optLong("timestamp", 0L) == timestamp) {
+                item.put("classification", "IGNORADA")
+                break
+            }
+        }
+
+        prefs.edit()
+            .putString("transaction_history", historyJson.toString())
+            .apply()
+
+        refreshData()
+    }
+
+    fun saveManualTransaction() {
+        val amount = manualAmount
+            .replace(",", ".")
+            .toDoubleOrNull()
+            ?: return
+
+        val prefs = context.getSharedPreferences(
+            "contai_notifications",
+            Context.MODE_PRIVATE
+        )
+
+        val historyJson = JSONArray(
+            prefs.getString("transaction_history", "[]") ?: "[]"
+        )
+
+        val item = org.json.JSONObject()
+            .put("timestamp", System.currentTimeMillis())
+            .put("package", "MANUAL")
+            .put("title", manualDescription.ifBlank { "Lançamento manual" })
+            .put("text", manualDescription)
+            .put("type", manualType)
+            .put("category", manualCategory)
+            .put("confidence", 100)
+            .put("classification", "CONFIRMADA")
+            .put("amount", amount)
+
+        historyJson.put(item)
+
+        prefs.edit()
+            .putString("transaction_history", historyJson.toString())
+            .apply()
+
+        manualAmount = ""
+        manualDescription = ""
+        manualType = "DESPESA"
+        manualCategory = "Outros"
+        showManualEntryDialog = false
+
+        refreshData()
+    }
 
     fun confirmTransaction(timestamp: Long) {
         val prefs = context.getSharedPreferences(
@@ -396,6 +469,126 @@ fun ContaiApp() {
         refreshData()
     }
 
+    if (showManualEntryDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showManualEntryDialog = false
+            },
+            title = {
+                Text("Adicionar manualmente")
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 450.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text("Tipo")
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = manualType == "ENTRADA",
+                            onClick = {
+                                manualType = "ENTRADA"
+                                manualCategory = "Receitas"
+                            },
+                            label = { Text("Entrada") }
+                        )
+
+                        FilterChip(
+                            selected = manualType == "DESPESA",
+                            onClick = {
+                                manualType = "DESPESA"
+                                manualCategory = "Outros"
+                            },
+                            label = { Text("Despesa") }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = manualAmount,
+                        onValueChange = { manualAmount = it },
+                        label = { Text("Valor") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text("Categoria")
+
+                    val manualCategories =
+                        if (manualType == "ENTRADA") {
+                            listOf(
+                                "Receitas",
+                                "Salário",
+                                "Pix recebido",
+                                "Outros"
+                            ) + customIncomeCategories
+                        } else {
+                            listOf(
+                                "Alimentação",
+                                "Transporte",
+                                "Combustível",
+                                "Moradia",
+                                "Saúde",
+                                "Compras",
+                                "Lazer",
+                                "Outros"
+                            ) + customExpenseCategories
+                        }
+
+                    manualCategories
+                        .distinct()
+                        .forEach { category ->
+                            FilterChip(
+                                selected = manualCategory == category,
+                                onClick = {
+                                    manualCategory = category
+                                },
+                                label = {
+                                    Text(category)
+                                }
+                            )
+                        }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = manualDescription,
+                        onValueChange = { manualDescription = it },
+                        label = { Text("Descrição") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        saveManualTransaction()
+                    },
+                    enabled = manualAmount
+                        .replace(",", ".")
+                        .toDoubleOrNull() != null
+                ) {
+                    Text("Salvar")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showManualEntryDialog = false
+                    }
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     MaterialTheme {
         Surface(
             modifier = Modifier.fillMaxSize()
@@ -415,6 +608,16 @@ fun ContaiApp() {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text("Seu assessor financeiro pessoal")
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        showManualEntryDialog = true
+                    }
+                ) {
+                    Text("Adicionar manualmente")
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -684,6 +887,20 @@ fun ContaiApp() {
                                         ) {
                                             Text("Corrigir")
                                         }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            ignoreTransaction(transaction.timestamp)
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Ignorar")
+                                    }
+
+                                    Row {
                                     }
                                 }
                             }
