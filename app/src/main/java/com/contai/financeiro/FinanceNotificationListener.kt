@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.ComponentName
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import org.json.JSONArray
+import org.json.JSONObject
 
 class FinanceNotificationListener : NotificationListenerService() {
 
@@ -34,6 +36,37 @@ class FinanceNotificationListener : NotificationListenerService() {
         NotificationListenerService.requestRebind(
             ComponentName(this, FinanceNotificationListener::class.java)
         )
+    }
+
+    private fun saveToHistory(
+        packageName: String,
+        title: String,
+        text: String,
+        parsed: ParsedTransaction
+    ) {
+        val prefs = prefs()
+        val history = JSONArray(
+            prefs.getString("transaction_history", "[]") ?: "[]"
+        )
+
+        val item = JSONObject()
+            .put("timestamp", System.currentTimeMillis())
+            .put("package", packageName)
+            .put("title", title)
+            .put("text", text)
+            .put("type", parsed.type)
+            .put("confidence", parsed.confidence)
+            .put("classification", parsed.classification)
+
+        if (parsed.amount != null) {
+            item.put("amount", parsed.amount)
+        }
+
+        history.put(item)
+
+        prefs.edit()
+            .putString("transaction_history", history.toString())
+            .apply()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -71,6 +104,13 @@ class FinanceNotificationListener : NotificationListenerService() {
         if (parsed.classification == "NAO_FINANCEIRA") {
             return
         }
+
+        saveToHistory(
+            sbn?.packageName.orEmpty(),
+            title,
+            text,
+            parsed
+        )
 
         val editor = prefs().edit()
             .putString("last_package", sbn?.packageName.orEmpty())
