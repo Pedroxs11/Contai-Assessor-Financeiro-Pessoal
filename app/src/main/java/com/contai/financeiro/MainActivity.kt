@@ -153,6 +153,7 @@ fun ContaiApp() {
     if (transactionToCorrect != null) {
         val transaction = transactionToCorrect!!
         var selectedType by remember(transaction.timestamp) { mutableStateOf(transaction.type) }
+        var selectedCategory by remember(transaction.timestamp) { mutableStateOf(transaction.category) }
 
         AlertDialog(
             onDismissRequest = {
@@ -182,7 +183,36 @@ fun ContaiApp() {
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Categoria: ${transaction.category}")
+                    Text("Categoria")
+
+                    val categories = if (selectedType == "ENTRADA") {
+                        listOf("Salário", "Pix recebido", "Outros")
+                    } else {
+                        listOf(
+                            "Alimentação",
+                            "Transporte",
+                            "Combustível",
+                            "Moradia",
+                            "Saúde",
+                            "Compras",
+                            "Lazer",
+                            "Outros"
+                        )
+                    }
+
+                    categories.forEach { category ->
+                        FilterChip(
+                            selected = selectedCategory == category,
+                            onClick = {
+                                selectedCategory = category
+                            },
+                            label = {
+                                Text(category)
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text("Origem: ${transaction.source}")
                 }
             },
@@ -203,6 +233,7 @@ fun ContaiApp() {
 
                             if (item.optLong("timestamp", 0L) == transaction.timestamp) {
                                 item.put("type", selectedType)
+                                item.put("category", selectedCategory)
                                 item.put("classification", "CONFIRMADA")
                                 break
                             }
