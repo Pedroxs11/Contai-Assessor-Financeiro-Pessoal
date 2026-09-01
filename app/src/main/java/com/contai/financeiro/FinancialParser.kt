@@ -36,7 +36,6 @@ object FinancialParser {
             "mercadopago",
             "picpay",
             "caixa",
-            "bb",
             "bancodobrasil"
         )
 
@@ -75,7 +74,16 @@ object FinancialParser {
             "até 3x",
             "ate 3x",
             "frete grátis",
-            "frete gratis"
+            "frete gratis",
+            "aproveite",
+            "imperdível",
+            "imperdivel",
+            "cashback",
+            "ganhe",
+            "economize",
+            "por apenas",
+            "clique aqui",
+            "compre agora"
         )
 
         val hasPromoWords =
