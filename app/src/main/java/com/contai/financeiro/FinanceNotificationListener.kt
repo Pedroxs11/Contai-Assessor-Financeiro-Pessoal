@@ -2,6 +2,8 @@ package com.contai.financeiro
 
 import android.content.Context
 import android.content.ComponentName
+import android.os.Handler
+import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import org.json.JSONArray
@@ -9,14 +11,39 @@ import org.json.JSONObject
 
 class FinanceNotificationListener : NotificationListenerService() {
 
+    private val heartbeatHandler = Handler(Looper.getMainLooper())
+
+    private val heartbeatRunnable = object : Runnable {
+        override fun run() {
+            prefs().edit()
+                .putBoolean("service_connected", true)
+                .putLong("listener_last_alive_at", System.currentTimeMillis())
+                .apply()
+
+            heartbeatHandler.postDelayed(this, 15_000)
+        }
+    }
+
+    private fun startHeartbeat() {
+        heartbeatHandler.removeCallbacks(heartbeatRunnable)
+        heartbeatHandler.post(heartbeatRunnable)
+    }
+
+    private fun stopHeartbeat() {
+        heartbeatHandler.removeCallbacks(heartbeatRunnable)
+    }
+
     private fun prefs() =
         getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
 
     override fun onListenerConnected() {
         super.onListenerConnected()
 
+        startHeartbeat()
+
         prefs().edit()
             .putBoolean("service_connected", true)
+            .putLong("listener_last_alive_at", System.currentTimeMillis())
             .putString("last_package", "SISTEMA CONTAI")
             .putString("last_title", "Serviço conectado")
             .putString(
@@ -29,6 +56,8 @@ class FinanceNotificationListener : NotificationListenerService() {
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
 
+        stopHeartbeat()
+
         prefs().edit()
             .putBoolean("service_connected", false)
             .apply()
@@ -36,6 +65,16 @@ class FinanceNotificationListener : NotificationListenerService() {
         NotificationListenerService.requestRebind(
             ComponentName(this, FinanceNotificationListener::class.java)
         )
+    }
+
+    override fun onDestroy() {
+        stopHeartbeat()
+
+        prefs().edit()
+            .putBoolean("service_connected", false)
+            .apply()
+
+        super.onDestroy()
     }
 
     private fun saveToHistory(
@@ -80,8 +119,18 @@ class FinanceNotificationListener : NotificationListenerService() {
             }
         }
 
+        val normalizedLearningText =
+            text
+                .lowercase()
+                .replace(
+                    Regex("""r\$\s*[0-9.]+,[0-9]{2}"""),
+                    "r$ valor"
+                )
+                .replace(Regex("""\s+"""), " ")
+                .trim()
+
         val learningKey =
-            "$packageName|$title"
+            "$packageName|$title|$normalizedLearningText"
                 .lowercase()
                 .trim()
 
@@ -148,6 +197,7 @@ class FinanceNotificationListener : NotificationListenerService() {
         ).firstOrNull { it.isNotBlank() }.orEmpty()
 
         prefs().edit()
+            .putLong("listener_last_alive_at", System.currentTimeMillis())
             .putLong("debug_last_event_at", System.currentTimeMillis())
             .putString("debug_last_package", sbn?.packageName.orEmpty())
             .putString("debug_last_title", title)

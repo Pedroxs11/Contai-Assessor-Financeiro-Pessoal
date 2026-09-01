@@ -48,6 +48,7 @@ fun ContaiApp() {
     var lastClassification by remember { mutableStateOf("") }
     var notificationAccess by remember { mutableStateOf(false) }
     var serviceConnected by remember { mutableStateOf(false) }
+    var listenerLastAliveAt by remember { mutableStateOf(0L) }
     var debugLastEventAt by remember { mutableStateOf(0L) }
     var debugLastPackage by remember { mutableStateOf("") }
     var debugLastTitle by remember { mutableStateOf("") }
@@ -104,6 +105,7 @@ fun ContaiApp() {
         lastConfidence = prefs.getInt("last_confidence", 0)
         lastClassification = prefs.getString("last_classification", "") ?: ""
         serviceConnected = prefs.getBoolean("service_connected", false)
+        listenerLastAliveAt = prefs.getLong("listener_last_alive_at", 0L)
         debugLastEventAt = prefs.getLong("debug_last_event_at", 0L)
         debugLastPackage = prefs.getString("debug_last_package", "") ?: ""
         debugLastTitle = prefs.getString("debug_last_title", "") ?: ""
@@ -171,6 +173,19 @@ fun ContaiApp() {
         notificationAccess =
             enabledListeners.contains(context.packageName)
     }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            refreshData()
+            delay(5_000)
+        }
+    }
+
+    val listenerHealthy =
+        notificationAccess &&
+        serviceConnected &&
+        listenerLastAliveAt > 0L &&
+        System.currentTimeMillis() - listenerLastAliveAt <= 45_000
 
     fun confirmTransaction(timestamp: Long) {
         val prefs = context.getSharedPreferences(
@@ -320,8 +335,18 @@ fun ContaiApp() {
                                 item.put("category", selectedCategory)
                                 item.put("classification", "CONFIRMADA")
 
+                                val normalizedLearningText =
+                                    transaction.text
+                                        .lowercase()
+                                        .replace(
+                                            Regex("""r\$\s*[0-9.]+,[0-9]{2}"""),
+                                            "r$ valor"
+                                        )
+                                        .replace(Regex("""\s+"""), " ")
+                                        .trim()
+
                                 val learningKey =
-                                    "${transaction.source}|${transaction.title}"
+                                    "${transaction.source}|${transaction.title}|$normalizedLearningText"
                                         .lowercase()
                                         .trim()
 
@@ -405,10 +430,15 @@ fun ContaiApp() {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = if (serviceConnected) {
-                        "Serviço de captura: CONECTADO"
-                    } else {
-                        "Serviço de captura: DESCONECTADO"
+                    text = when {
+                        !notificationAccess ->
+                            "Serviço de captura: SEM PERMISSÃO"
+
+                        listenerHealthy ->
+                            "Serviço de captura: CONECTADO"
+
+                        else ->
+                            "Serviço de captura: CAPTURA INTERROMPIDA"
                     },
                     style = MaterialTheme.typography.titleMedium
                 )
