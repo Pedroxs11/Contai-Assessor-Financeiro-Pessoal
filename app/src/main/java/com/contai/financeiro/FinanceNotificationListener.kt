@@ -49,6 +49,37 @@ class FinanceNotificationListener : NotificationListenerService() {
             prefs.getString("transaction_history", "[]") ?: "[]"
         )
 
+        if (history.length() > 0) {
+            val lastItem = history.getJSONObject(history.length() - 1)
+            val lastTimestamp = lastItem.optLong("timestamp", 0L)
+            val now = System.currentTimeMillis()
+
+            val samePackage = lastItem.optString("package") == packageName
+            val sameTitle = lastItem.optString("title") == title
+            val sameText = lastItem.optString("text") == text
+            val sameType = lastItem.optString("type") == parsed.type
+
+            val lastAmount = if (lastItem.has("amount")) {
+                lastItem.optDouble("amount")
+            } else {
+                null
+            }
+
+            val sameAmount = lastAmount == parsed.amount
+            val within30Seconds = now - lastTimestamp <= 30_000
+
+            if (
+                samePackage &&
+                sameTitle &&
+                sameText &&
+                sameType &&
+                sameAmount &&
+                within30Seconds
+            ) {
+                return
+            }
+        }
+
         val category = when (parsed.type) {
             "ENTRADA" -> "Receitas"
             "DESPESA" -> "Outros"

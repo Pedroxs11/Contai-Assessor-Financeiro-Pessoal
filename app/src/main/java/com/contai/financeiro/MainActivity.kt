@@ -495,6 +495,60 @@ fun ContaiApp() {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
+                val confirmedForTotals = transactionHistory.filter {
+                    it.status == "CONFIRMADA"
+                }
+
+                val totalIncome = confirmedForTotals
+                    .filter { it.type == "ENTRADA" }
+                    .sumOf { it.amount ?: 0.0 }
+
+                val totalExpense = confirmedForTotals
+                    .filter { it.type == "DESPESA" }
+                    .sumOf { it.amount ?: 0.0 }
+
+                val balance = totalIncome - totalExpense
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Card(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Text("Entradas")
+                            Text("R$ " + String.format(Locale.getDefault(), "%.2f", totalIncome))
+                        }
+                    }
+
+                    Card(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Text("Despesas")
+                            Text("R$ " + String.format(Locale.getDefault(), "%.2f", totalExpense))
+                        }
+                    }
+
+                    Card(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Text("Saldo")
+                            Text("R$ " + String.format(Locale.getDefault(), "%.2f", balance))
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
