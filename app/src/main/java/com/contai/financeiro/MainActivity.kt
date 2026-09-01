@@ -56,6 +56,7 @@ fun ContaiApp() {
     var customIncomeCategories by remember { mutableStateOf(listOf<String>()) }
     var customExpenseCategories by remember { mutableStateOf(listOf<String>()) }
     var newCategoryName by remember { mutableStateOf("") }
+    var selectedSection by remember { mutableStateOf("PENDENCIAS") }
 
     fun addCustomCategory(name: String, type: String) {
         val cleanName = name.trim()
@@ -494,17 +495,46 @@ fun ContaiApp() {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedSection == "PENDENCIAS",
+                        onClick = { selectedSection = "PENDENCIAS" },
+                        label = { Text("Pendências") }
+                    )
+
+                    FilterChip(
+                        selected = selectedSection == "HISTORICO",
+                        onClick = { selectedSection = "HISTORICO" },
+                        label = { Text("Histórico") }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Text(
-                    text = "Histórico de transações",
+                    text = if (selectedSection == "PENDENCIAS") "Pendências" else "Histórico",
                     style = MaterialTheme.typography.titleLarge
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                if (transactionHistory.isEmpty()) {
-                    Text("Nenhuma transação no histórico.")
+                val displayedTransactions = if (selectedSection == "PENDENCIAS") {
+                    transactionHistory.filter { it.status == "POSSIVEL" }
                 } else {
-                    transactionHistory.forEach { transaction ->
+                    transactionHistory.filter { it.status == "CONFIRMADA" }
+                }
+
+                if (displayedTransactions.isEmpty()) {
+                    Text(
+                        if (selectedSection == "PENDENCIAS")
+                            "Nenhuma transação pendente."
+                        else
+                            "Nenhuma transação no histórico."
+                    )
+                } else {
+                    displayedTransactions.forEach { transaction ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
