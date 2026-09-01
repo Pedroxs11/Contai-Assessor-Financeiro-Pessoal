@@ -52,6 +52,7 @@ fun ContaiApp() {
     var debugLastPackage by remember { mutableStateOf("") }
     var debugLastTitle by remember { mutableStateOf("") }
     var transactionHistory by remember { mutableStateOf(listOf<TransactionRecord>()) }
+    var transactionToCorrect by remember { mutableStateOf<TransactionRecord?>(null) }
 
     fun refreshData() {
         val prefs = context.getSharedPreferences(
@@ -147,6 +148,45 @@ fun ContaiApp() {
             .apply()
 
         refreshData()
+    }
+
+    if (transactionToCorrect != null) {
+        val transaction = transactionToCorrect!!
+
+        AlertDialog(
+            onDismissRequest = {
+                transactionToCorrect = null
+            },
+            title = {
+                Text("Corrigir transação")
+            },
+            text = {
+                Column {
+                    Text("Valor: R$ ${transaction.amount ?: 0.0}")
+                    Text("Tipo: ${transaction.type}")
+                    Text("Categoria: ${transaction.category}")
+                    Text("Origem: ${transaction.source}")
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        transactionToCorrect = null
+                    }
+                ) {
+                    Text("Continuar")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        transactionToCorrect = null
+                    }
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     LaunchedEffect(Unit) {
@@ -343,12 +383,24 @@ fun ContaiApp() {
                                 if (transaction.status == "POSSIVEL") {
                                     Spacer(modifier = Modifier.height(12.dp))
 
-                                    Button(
-                                        onClick = {
-                                            confirmTransaction(transaction.timestamp)
-                                        }
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text("Confirmar")
+                                        Button(
+                                            onClick = {
+                                                confirmTransaction(transaction.timestamp)
+                                            }
+                                        ) {
+                                            Text("Confirmar")
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                transactionToCorrect = transaction
+                                            }
+                                        ) {
+                                            Text("Corrigir")
+                                        }
                                     }
                                 }
                             }
