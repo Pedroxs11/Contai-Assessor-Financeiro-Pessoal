@@ -9,6 +9,8 @@ import android.service.notification.NotificationListenerService
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
@@ -16,6 +18,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import org.json.JSONArray
 
 class MainActivity : ComponentActivity() {
 
@@ -45,6 +48,7 @@ fun ContaiApp() {
     var debugLastEventAt by remember { mutableStateOf(0L) }
     var debugLastPackage by remember { mutableStateOf("") }
     var debugLastTitle by remember { mutableStateOf("") }
+    var transactionHistory by remember { mutableStateOf(listOf<String>()) }
 
     fun refreshData() {
         val prefs = context.getSharedPreferences(
@@ -63,6 +67,31 @@ fun ContaiApp() {
         debugLastEventAt = prefs.getLong("debug_last_event_at", 0L)
         debugLastPackage = prefs.getString("debug_last_package", "") ?: ""
         debugLastTitle = prefs.getString("debug_last_title", "") ?: ""
+
+        val historyJson = JSONArray(
+            prefs.getString("transaction_history", "[]") ?: "[]"
+        )
+
+        val historyItems = mutableListOf<String>()
+
+        for (i in historyJson.length() - 1 downTo 0) {
+            val item = historyJson.getJSONObject(i)
+
+            val amount = if (item.has("amount")) {
+                "R$ " + item.getDouble("amount").toString().replace(".", ",")
+            } else {
+                "Valor não identificado"
+            }
+
+            val type = item.optString("type", "NAO_IDENTIFICADO")
+            val classification = item.optString("classification", "")
+
+            historyItems.add(
+                "$amount • $type • $classification"
+            )
+        }
+
+        transactionHistory = historyItems
 
         val enabledListeners =
             Settings.Secure.getString(
@@ -93,6 +122,7 @@ fun ContaiApp() {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
                     .padding(24.dp)
             ) {
 
@@ -219,6 +249,33 @@ fun ContaiApp() {
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "Histórico de transações",
+                    style = MaterialTheme.typography.titleLarge
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (transactionHistory.isEmpty()) {
+                    Text("Nenhuma transação no histórico.")
+                } else {
+                    transactionHistory.forEach { transaction ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
+                        ) {
+                            Text(
+                                text = transaction,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
+                    }
+                }
+
             }
         }
     }
