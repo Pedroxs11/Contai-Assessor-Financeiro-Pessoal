@@ -123,6 +123,32 @@ fun ContaiApp() {
             enabledListeners.contains(context.packageName)
     }
 
+    fun confirmTransaction(timestamp: Long) {
+        val prefs = context.getSharedPreferences(
+            "contai_notifications",
+            Context.MODE_PRIVATE
+        )
+
+        val historyJson = JSONArray(
+            prefs.getString("transaction_history", "[]") ?: "[]"
+        )
+
+        for (i in 0 until historyJson.length()) {
+            val item = historyJson.getJSONObject(i)
+
+            if (item.optLong("timestamp", 0L) == timestamp) {
+                item.put("classification", "CONFIRMADA")
+                break
+            }
+        }
+
+        prefs.edit()
+            .putString("transaction_history", historyJson.toString())
+            .apply()
+
+        refreshData()
+    }
+
     LaunchedEffect(Unit) {
         NotificationListenerService.requestRebind(
             ComponentName(
@@ -307,10 +333,25 @@ fun ContaiApp() {
                                 "Data não disponível"
                             }
 
-                            Text(
-                                text = "$amountText\n${transaction.type} • ${transaction.category}\n$statusText\n${transaction.source}\n$dateText",
+                            Column(
                                 modifier = Modifier.padding(16.dp)
-                            )
+                            ) {
+                                Text(
+                                    text = "$amountText\n${transaction.type} • ${transaction.category}\n$statusText\n${transaction.source}\n$dateText"
+                                )
+
+                                if (transaction.status == "POSSIVEL") {
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    Button(
+                                        onClick = {
+                                            confirmTransaction(transaction.timestamp)
+                                        }
+                                    ) {
+                                        Text("Confirmar")
+                                    }
+                                }
+                            }
                         }
                     }
                 }
