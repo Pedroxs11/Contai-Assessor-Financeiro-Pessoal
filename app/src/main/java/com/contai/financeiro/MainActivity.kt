@@ -51,7 +51,7 @@ fun ContaiApp() {
     var debugLastEventAt by remember { mutableStateOf(0L) }
     var debugLastPackage by remember { mutableStateOf("") }
     var debugLastTitle by remember { mutableStateOf("") }
-    var transactionHistory by remember { mutableStateOf(listOf<String>()) }
+    var transactionHistory by remember { mutableStateOf(listOf<TransactionRecord>()) }
 
     fun refreshData() {
         val prefs = context.getSharedPreferences(
@@ -75,40 +75,39 @@ fun ContaiApp() {
             prefs.getString("transaction_history", "[]") ?: "[]"
         )
 
-        val historyItems = mutableListOf<String>()
+        val historyItems = mutableListOf<TransactionRecord>()
 
         for (i in historyJson.length() - 1 downTo 0) {
             val item = historyJson.getJSONObject(i)
 
             val amount = if (item.has("amount")) {
-                "R$ " + item.getDouble("amount").toString().replace(".", ",")
+                item.optDouble("amount")
             } else {
-                "Valor não identificado"
+                null
             }
 
             val type = item.optString("type", "NAO_IDENTIFICADO")
-            val classification = item.optString("classification", "")
-            val category = item.optString("category", "Não categorizado")
-            val source = item.optString("package", "Origem desconhecida")
-            val timestamp = item.optLong("timestamp", 0L)
 
-            val dateText = if (timestamp > 0L) {
-                SimpleDateFormat(
-                    "dd/MM/yyyy HH:mm",
-                    Locale.getDefault()
-                ).format(Date(timestamp))
-            } else {
-                "Data não disponível"
-            }
-
-            val statusText = when (classification) {
-                "CONFIRMADA" -> "Confirmada"
-                "POSSIVEL" -> "Aguardando confirmação"
-                else -> classification.ifBlank { "Não identificado" }
+            val category = item.optString("category").ifBlank {
+                when (type) {
+                    "ENTRADA" -> "Receitas"
+                    "DESPESA" -> "Outros"
+                    else -> "Não categorizado"
+                }
             }
 
             historyItems.add(
-                "$amount\n$type • $category\n$statusText\n$source\n$dateText"
+                TransactionRecord(
+                    amount = amount,
+                    type = type,
+                    timestamp = item.optLong("timestamp", 0L),
+                    category = category,
+                    status = item.optString("classification", ""),
+                    source = item.optString("package", ""),
+                    title = item.optString("title", ""),
+                    text = item.optString("text", ""),
+                    confidence = item.optInt("confidence", 0)
+                )
             )
         }
 
@@ -289,8 +288,27 @@ fun ContaiApp() {
                                 .fillMaxWidth()
                                 .padding(bottom = 8.dp)
                         ) {
+                            val amountText = transaction.amount?.let {
+                                "R$ " + it.toString().replace(".", ",")
+                            } ?: "Valor não identificado"
+
+                            val statusText = when (transaction.status) {
+                                "CONFIRMADA" -> "Confirmada"
+                                "POSSIVEL" -> "Aguardando confirmação"
+                                else -> transaction.status.ifBlank { "Não identificado" }
+                            }
+
+                            val dateText = if (transaction.timestamp > 0L) {
+                                SimpleDateFormat(
+                                    "dd/MM/yyyy HH:mm",
+                                    Locale.getDefault()
+                                ).format(Date(transaction.timestamp))
+                            } else {
+                                "Data não disponível"
+                            }
+
                             Text(
-                                text = transaction,
+                                text = "$amountText\n${transaction.type} • ${transaction.category}\n$statusText\n${transaction.source}\n$dateText",
                                 modifier = Modifier.padding(16.dp)
                             )
                         }
