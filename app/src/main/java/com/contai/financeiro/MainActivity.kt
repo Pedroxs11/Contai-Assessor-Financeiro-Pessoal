@@ -19,6 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.json.JSONArray
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
 
@@ -85,9 +88,27 @@ fun ContaiApp() {
 
             val type = item.optString("type", "NAO_IDENTIFICADO")
             val classification = item.optString("classification", "")
+            val category = item.optString("category", "Não categorizado")
+            val source = item.optString("package", "Origem desconhecida")
+            val timestamp = item.optLong("timestamp", 0L)
+
+            val dateText = if (timestamp > 0L) {
+                SimpleDateFormat(
+                    "dd/MM/yyyy HH:mm",
+                    Locale.getDefault()
+                ).format(Date(timestamp))
+            } else {
+                "Data não disponível"
+            }
+
+            val statusText = when (classification) {
+                "CONFIRMADA" -> "Confirmada"
+                "POSSIVEL" -> "Aguardando confirmação"
+                else -> classification.ifBlank { "Não identificado" }
+            }
 
             historyItems.add(
-                "$amount • $type • $classification"
+                "$amount\n$type • $category\n$statusText\n$source\n$dateText"
             )
         }
 

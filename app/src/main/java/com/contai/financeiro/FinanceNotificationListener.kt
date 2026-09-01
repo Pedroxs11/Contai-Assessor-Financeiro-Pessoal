@@ -49,12 +49,19 @@ class FinanceNotificationListener : NotificationListenerService() {
             prefs.getString("transaction_history", "[]") ?: "[]"
         )
 
+        val category = when (parsed.type) {
+            "ENTRADA" -> "Receitas"
+            "DESPESA" -> "Outros"
+            else -> "Não categorizado"
+        }
+
         val item = JSONObject()
             .put("timestamp", System.currentTimeMillis())
             .put("package", packageName)
             .put("title", title)
             .put("text", text)
             .put("type", parsed.type)
+            .put("category", category)
             .put("confidence", parsed.confidence)
             .put("classification", parsed.classification)
 
