@@ -152,6 +152,7 @@ fun ContaiApp() {
 
     if (transactionToCorrect != null) {
         val transaction = transactionToCorrect!!
+        var selectedType by remember(transaction.timestamp) { mutableStateOf(transaction.type) }
 
         AlertDialog(
             onDismissRequest = {
@@ -163,7 +164,24 @@ fun ContaiApp() {
             text = {
                 Column {
                     Text("Valor: R$ ${transaction.amount ?: 0.0}")
-                    Text("Tipo: ${transaction.type}")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Tipo")
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = selectedType == "ENTRADA",
+                            onClick = { selectedType = "ENTRADA" },
+                            label = { Text("Entrada") }
+                        )
+
+                        FilterChip(
+                            selected = selectedType == "DESPESA",
+                            onClick = { selectedType = "DESPESA" },
+                            label = { Text("Despesa") }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text("Categoria: ${transaction.category}")
                     Text("Origem: ${transaction.source}")
                 }
@@ -171,7 +189,31 @@ fun ContaiApp() {
             confirmButton = {
                 Button(
                     onClick = {
+                        val prefs = context.getSharedPreferences(
+                            "contai_notifications",
+                            Context.MODE_PRIVATE
+                        )
+
+                        val historyJson = JSONArray(
+                            prefs.getString("transaction_history", "[]") ?: "[]"
+                        )
+
+                        for (i in 0 until historyJson.length()) {
+                            val item = historyJson.getJSONObject(i)
+
+                            if (item.optLong("timestamp", 0L) == transaction.timestamp) {
+                                item.put("type", selectedType)
+                                item.put("classification", "CONFIRMADA")
+                                break
+                            }
+                        }
+
+                        prefs.edit()
+                            .putString("transaction_history", historyJson.toString())
+                            .apply()
+
                         transactionToCorrect = null
+                        refreshData()
                     }
                 ) {
                     Text("Continuar")
