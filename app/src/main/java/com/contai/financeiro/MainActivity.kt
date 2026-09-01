@@ -53,6 +53,41 @@ fun ContaiApp() {
     var debugLastTitle by remember { mutableStateOf("") }
     var transactionHistory by remember { mutableStateOf(listOf<TransactionRecord>()) }
     var transactionToCorrect by remember { mutableStateOf<TransactionRecord?>(null) }
+    var customIncomeCategories by remember { mutableStateOf(listOf<String>()) }
+    var customExpenseCategories by remember { mutableStateOf(listOf<String>()) }
+    var newCategoryName by remember { mutableStateOf("") }
+
+    fun addCustomCategory(name: String, type: String) {
+        val cleanName = name.trim()
+        if (cleanName.isBlank()) return
+
+        val prefs = context.getSharedPreferences(
+            "contai_notifications",
+            Context.MODE_PRIVATE
+        )
+
+        if (type == "ENTRADA") {
+            val updated = (customIncomeCategories + cleanName)
+                .distinct()
+                .sorted()
+
+            prefs.edit()
+                .putStringSet("custom_income_categories", updated.toSet())
+                .apply()
+
+            customIncomeCategories = updated
+        } else {
+            val updated = (customExpenseCategories + cleanName)
+                .distinct()
+                .sorted()
+
+            prefs.edit()
+                .putStringSet("custom_expense_categories", updated.toSet())
+                .apply()
+
+            customExpenseCategories = updated
+        }
+    }
 
     fun refreshData() {
         val prefs = context.getSharedPreferences(
@@ -71,6 +106,18 @@ fun ContaiApp() {
         debugLastEventAt = prefs.getLong("debug_last_event_at", 0L)
         debugLastPackage = prefs.getString("debug_last_package", "") ?: ""
         debugLastTitle = prefs.getString("debug_last_title", "") ?: ""
+
+        customIncomeCategories = prefs
+            .getStringSet("custom_income_categories", emptySet())
+            ?.toList()
+            ?.sorted()
+            ?: emptyList()
+
+        customExpenseCategories = prefs
+            .getStringSet("custom_expense_categories", emptySet())
+            ?.toList()
+            ?.sorted()
+            ?: emptyList()
 
         val historyJson = JSONArray(
             prefs.getString("transaction_history", "[]") ?: "[]"
@@ -163,7 +210,11 @@ fun ContaiApp() {
                 Text("Corrigir transação")
             },
             text = {
-                Column {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 450.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
                     Text("Valor: R$ ${transaction.amount ?: 0.0}")
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("Tipo")
@@ -186,7 +237,7 @@ fun ContaiApp() {
                     Text("Categoria")
 
                     val categories = if (selectedType == "ENTRADA") {
-                        listOf("Salário", "Pix recebido", "Outros")
+                        listOf("Salário", "Pix recebido", "Outros") + customIncomeCategories
                     } else {
                         listOf(
                             "Alimentação",
@@ -197,7 +248,7 @@ fun ContaiApp() {
                             "Compras",
                             "Lazer",
                             "Outros"
-                        )
+                        ) + customExpenseCategories
                     }
 
                     categories.forEach { category ->
@@ -213,12 +264,44 @@ fun ContaiApp() {
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = newCategoryName,
+                        onValueChange = { newCategoryName = it },
+                        label = { Text("Nova categoria") },
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = {
+                            val name = newCategoryName.trim()
+                            if (name.isNotBlank()) {
+                                addCustomCategory(name, selectedType)
+                                selectedCategory = name
+                                newCategoryName = ""
+                            }
+                        }
+                    ) {
+                        Text("Adicionar categoria")
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text("Origem: ${transaction.source}")
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
+                        val typedCategory = newCategoryName.trim()
+
+                        if (typedCategory.isNotBlank()) {
+                            addCustomCategory(typedCategory, selectedType)
+                            selectedCategory = typedCategory
+                            newCategoryName = ""
+                        }
+
                         val prefs = context.getSharedPreferences(
                             "contai_notifications",
                             Context.MODE_PRIVATE
