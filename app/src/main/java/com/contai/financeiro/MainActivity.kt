@@ -319,6 +319,19 @@ fun ContaiApp() {
                                 item.put("type", selectedType)
                                 item.put("category", selectedCategory)
                                 item.put("classification", "CONFIRMADA")
+
+                                val learningKey =
+                                    "${transaction.source}|${transaction.title}"
+                                        .lowercase()
+                                        .trim()
+
+                                prefs.edit()
+                                    .putString(
+                                        "learned_$learningKey",
+                                        "$selectedType|$selectedCategory"
+                                    )
+                                    .apply()
+
                                 break
                             }
                         }

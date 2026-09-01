@@ -80,18 +80,35 @@ class FinanceNotificationListener : NotificationListenerService() {
             }
         }
 
-        val category = when (parsed.type) {
-            "ENTRADA" -> "Receitas"
-            "DESPESA" -> "Outros"
-            else -> "Não categorizado"
-        }
+        val learningKey =
+            "$packageName|$title"
+                .lowercase()
+                .trim()
+
+        val learned = prefs.getString(
+            "learned_$learningKey",
+            null
+        )
+
+        val learnedParts = learned?.split("|", limit = 2)
+
+        val finalType =
+            learnedParts?.getOrNull(0) ?: parsed.type
+
+        val category =
+            learnedParts?.getOrNull(1)
+                ?: when (finalType) {
+                    "ENTRADA" -> "Receitas"
+                    "DESPESA" -> "Outros"
+                    else -> "Não categorizado"
+                }
 
         val item = JSONObject()
             .put("timestamp", System.currentTimeMillis())
             .put("package", packageName)
             .put("title", title)
             .put("text", text)
-            .put("type", parsed.type)
+            .put("type", finalType)
             .put("category", category)
             .put("confidence", parsed.confidence)
             .put("classification", parsed.classification)
