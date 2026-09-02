@@ -31,6 +31,7 @@ object FinancialParser {
             "santander",
             "nubank",
             "com.nu.production",
+            "br.com.digio.uber",
             "itau",
             "bradesco",
             "inter",

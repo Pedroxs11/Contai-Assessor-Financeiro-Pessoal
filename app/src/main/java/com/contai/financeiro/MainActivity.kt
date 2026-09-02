@@ -32,6 +32,16 @@ class MainActivity : ComponentActivity() {
             ContaiApp()
         }
     }
+
+}
+
+fun friendlyAppName(packageName: String): String {
+    return when (packageName.lowercase()) {
+        "com.nu.production" -> "Nubank"
+        "com.santander.app" -> "Santander"
+        "br.com.digio.uber" -> "Uber Conta"
+        else -> packageName
+    }
 }
 
 @Composable
@@ -377,7 +387,7 @@ fun ContaiApp() {
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Origem: ${transaction.source}")
+                    Text("Origem: ${friendlyAppName(transaction.source)}")
                 }
             },
             confirmButton = {
@@ -678,12 +688,37 @@ fun ContaiApp() {
                         )
 
                         scope.launch {
-                            delay(2500)
+                            delay(4000)
                             refreshData()
+
+                            val prefs = context.getSharedPreferences(
+                                "contai_notifications",
+                                Context.MODE_PRIVATE
+                            )
+
+                            val lastAlive =
+                                prefs.getLong("listener_last_alive_at", 0L)
+
+                            val connected =
+                                prefs.getBoolean("service_connected", false)
+
+                            val healthy =
+                                connected &&
+                                lastAlive > 0L &&
+                                System.currentTimeMillis() - lastAlive <= 45_000
+
+                            if (!healthy) {
+                                context.startActivity(
+                                    Intent(
+                                        "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"
+                                    )
+                                )
+                            }
                         }
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Reconectar captura")
+                    Text("Tentar reconectar captura")
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -718,7 +753,7 @@ fun ContaiApp() {
                         ) {
                             Text("Nenhuma notificação capturada ainda.")
                         } else {
-                            Text("App: $lastPackage")
+                            Text("App: ${friendlyAppName(lastPackage)}")
                             Spacer(modifier = Modifier.height(6.dp))
                             Text("Título: $lastTitle")
                             Spacer(modifier = Modifier.height(6.dp))
@@ -863,19 +898,21 @@ fun ContaiApp() {
                                 modifier = Modifier.padding(16.dp)
                             ) {
                                 Text(
-                                    text = "$amountText\n${transaction.type} • ${transaction.category}\n$statusText\n${transaction.source}\n$dateText"
+                                    text = "$amountText\n${transaction.type} • ${transaction.category}\n$statusText\n${friendlyAppName(transaction.source)}\n$dateText"
                                 )
 
                                 if (transaction.status == "POSSIVEL") {
                                     Spacer(modifier = Modifier.height(12.dp))
 
                                     Row(
+                                        modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         Button(
                                             onClick = {
                                                 confirmTransaction(transaction.timestamp)
-                                            }
+                                            },
+                                            modifier = Modifier.weight(1f)
                                         ) {
                                             Text("Confirmar")
                                         }
@@ -883,7 +920,8 @@ fun ContaiApp() {
                                         OutlinedButton(
                                             onClick = {
                                                 transactionToCorrect = transaction
-                                            }
+                                            },
+                                            modifier = Modifier.weight(1f)
                                         ) {
                                             Text("Corrigir")
                                         }
@@ -898,9 +936,6 @@ fun ContaiApp() {
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Text("Ignorar")
-                                    }
-
-                                    Row {
                                     }
                                 }
                             }
