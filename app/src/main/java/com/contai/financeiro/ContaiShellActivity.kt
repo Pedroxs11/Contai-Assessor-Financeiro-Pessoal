@@ -48,6 +48,7 @@ private fun ContaiShell() {
 
     var selectedDestination by remember { mutableStateOf(ContaiDestination.HOME) }
     var horizontalDrag by remember { mutableFloatStateOf(0f) }
+    var showQuickAdd by remember { mutableStateOf(false) }
 
     fun moveDestination(direction: Int) {
         val currentIndex = destinations.indexOf(selectedDestination)
@@ -55,12 +56,22 @@ private fun ContaiShell() {
         selectedDestination = destinations[nextIndex]
     }
 
+    if (showQuickAdd) {
+        QuickManualEntryDialog(
+            onDismiss = { showQuickAdd = false },
+            onSaved = {
+                showQuickAdd = false
+                selectedDestination = ContaiDestination.HOME
+            }
+        )
+    }
+
     Scaffold(
         bottomBar = {
             ContaiBottomNavigation(
                 selected = selectedDestination,
                 onDestinationSelected = { selectedDestination = it },
-                onAddClick = { selectedDestination = ContaiDestination.HOME }
+                onAddClick = { showQuickAdd = true }
             )
         }
     ) { innerPadding ->
