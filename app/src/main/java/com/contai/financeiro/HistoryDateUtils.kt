@@ -1,5 +1,13 @@
 package com.contai.financeiro
 
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -26,4 +34,15 @@ fun historyDateGroup(timestamp: Long, now: Long = System.currentTimeMillis()): S
     return SimpleDateFormat("dd 'de' MMMM", Locale("pt", "BR"))
         .format(Date(timestamp))
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale("pt", "BR")) else it.toString() }
+}
+
+@Composable
+fun HistoryDateHeader(label: String) {
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = label,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = 8.dp)
+    )
 }
