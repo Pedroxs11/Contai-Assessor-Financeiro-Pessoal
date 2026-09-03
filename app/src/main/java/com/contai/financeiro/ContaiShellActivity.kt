@@ -134,10 +134,7 @@ private fun ContaiShell(
                     title = "Agenda",
                     description = "Seus compromissos e lembretes ficarão aqui."
                 )
-                ContaiDestination.REPORTS -> DestinationPlaceholder(
-                    title = "Relatórios",
-                    description = "Seus indicadores e análises financeiras ficarão aqui."
-                )
+                ContaiDestination.REPORTS -> ReportsScreen(hideValues = hideValues)
                 ContaiDestination.PROFILE -> ProfileScreen(
                     themeMode = themeMode,
                     onThemeModeChange = onThemeModeChange,
