@@ -36,9 +36,22 @@ class FinanceNotificationListener : NotificationListenerService() {
     private fun prefs() =
         getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
 
+    private fun saveLifecycleEvent(event: String) {
+        prefs().edit()
+            .putString("listener_lifecycle_event", event)
+            .putLong("listener_lifecycle_at", System.currentTimeMillis())
+            .apply()
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        saveLifecycleEvent("onCreate")
+    }
+
     override fun onListenerConnected() {
         super.onListenerConnected()
 
+        saveLifecycleEvent("onListenerConnected")
         startHeartbeat()
 
         prefs().edit()
@@ -56,6 +69,7 @@ class FinanceNotificationListener : NotificationListenerService() {
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
 
+        saveLifecycleEvent("onListenerDisconnected")
         stopHeartbeat()
 
         prefs().edit()
@@ -68,6 +82,7 @@ class FinanceNotificationListener : NotificationListenerService() {
     }
 
     override fun onDestroy() {
+        saveLifecycleEvent("onDestroy")
         stopHeartbeat()
 
         prefs().edit()

@@ -230,8 +230,14 @@ fun ContaiApp() {
     }
 
     fun saveManualTransaction() {
-        val amount = manualAmount
+        val normalizedAmount = manualAmount
+            .trim()
+            .replace("R$", "", ignoreCase = true)
+            .replace(" ", "")
+            .replace(".", "")
             .replace(",", ".")
+
+        val amount = normalizedAmount
             .toDoubleOrNull()
             ?: return
 
@@ -658,10 +664,33 @@ fun ContaiApp() {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                val prefs = context.getSharedPreferences(
+                    "contai_notifications",
+                    Context.MODE_PRIVATE
+                )
+
+                val lifecycleEvent =
+                    prefs.getString("listener_lifecycle_event", "") ?: ""
+
+                val lifecycleAt =
+                    prefs.getLong("listener_lifecycle_at", 0L)
+
+                val lifecycleDateText =
+                    if (lifecycleAt > 0L) {
+                        SimpleDateFormat(
+                            "dd/MM/yyyy HH:mm:ss",
+                            Locale.getDefault()
+                        ).format(Date(lifecycleAt))
+                    } else {
+                        "nenhum"
+                    }
+
                 Text("Diagnóstico do listener")
                 Text("Último app recebido: ${debugLastPackage.ifBlank { "nenhum" }}")
                 Text("Último título recebido: ${debugLastTitle.ifBlank { "nenhum" }}")
-                Text("Último evento: ${if (debugLastEventAt > 0L) debugLastEventAt.toString() else "nenhum"}")
+                Text("Último evento de notificação: ${if (debugLastEventAt > 0L) debugLastEventAt.toString() else "nenhum"}")
+                Text("Ciclo de vida: ${lifecycleEvent.ifBlank { "nenhum" }}")
+                Text("Horário do ciclo de vida: $lifecycleDateText")
 
                 Spacer(modifier = Modifier.height(16.dp))
 
