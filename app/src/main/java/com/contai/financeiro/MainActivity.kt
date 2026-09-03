@@ -23,6 +23,7 @@ import org.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.contai.financeiro.ui.theme.ContaiTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -30,7 +31,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            ContaiApp()
+            ContaiTheme {
+                ContaiApp()
+            }
         }
     }
 
@@ -706,7 +709,10 @@ fun ContaiApp() {
                 val balance = totalIncome - totalExpense
 
                 Card(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp)
@@ -748,7 +754,10 @@ fun ContaiApp() {
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Card(
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        colors = CardDefaults.cardColors(
+                            containerColor = androidx.compose.ui.graphics.Color(0xFFEAF3FF)
+                        )
                     ) {
                         Column(
                             modifier = Modifier.padding(16.dp)
@@ -767,7 +776,10 @@ fun ContaiApp() {
                     }
 
                     Card(
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        colors = CardDefaults.cardColors(
+                            containerColor = androidx.compose.ui.graphics.Color(0xFFFFEEEE)
+                        )
                     ) {
                         Column(
                             modifier = Modifier.padding(16.dp)
@@ -789,29 +801,43 @@ fun ContaiApp() {
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    FilterChip(
-                        selected = selectedSection == "PENDENCIAS",
-                        onClick = { selectedSection = "PENDENCIAS" },
-                        label = { Text("Pendências") }
-                    )
+                    if (selectedSection == "PENDENCIAS") {
+                        Button(
+                            onClick = { selectedSection = "PENDENCIAS" },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Pendências")
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { selectedSection = "PENDENCIAS" },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Pendências")
+                        }
+                    }
 
-                    FilterChip(
-                        selected = selectedSection == "HISTORICO",
-                        onClick = { selectedSection = "HISTORICO" },
-                        label = { Text("Histórico") }
-                    )
+                    if (selectedSection == "HISTORICO") {
+                        Button(
+                            onClick = { selectedSection = "HISTORICO" },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Histórico")
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { selectedSection = "HISTORICO" },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Histórico")
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = if (selectedSection == "PENDENCIAS") "Pendências" else "Histórico",
-                    style = MaterialTheme.typography.titleLarge
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
 
                 val displayedTransactions = if (selectedSection == "PENDENCIAS") {
                     transactionHistory.filter { it.status == "POSSIVEL" }
