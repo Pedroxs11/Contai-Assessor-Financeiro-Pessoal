@@ -30,6 +30,7 @@ import com.contai.financeiro.ui.theme.ContaiTheme
 
 private const val SETTINGS_PREFS = "contai_settings"
 private const val THEME_MODE_KEY = "theme_mode"
+private const val HIDE_VALUES_KEY = "hide_values"
 
 class ContaiShellActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,15 +42,23 @@ class ContaiShellActivity : ComponentActivity() {
                     ?: AppThemeMode.SYSTEM.name
             )
         }.getOrDefault(AppThemeMode.SYSTEM)
+        val savedHideValues = settings.getBoolean(HIDE_VALUES_KEY, false)
 
         setContent {
             var themeMode by remember { mutableStateOf(savedThemeMode) }
+            var hideValues by remember { mutableStateOf(savedHideValues) }
+
             ContaiTheme(mode = themeMode) {
                 ContaiShell(
                     themeMode = themeMode,
                     onThemeModeChange = { newMode ->
                         themeMode = newMode
                         settings.edit().putString(THEME_MODE_KEY, newMode.name).apply()
+                    },
+                    hideValues = hideValues,
+                    onHideValuesChange = { shouldHide ->
+                        hideValues = shouldHide
+                        settings.edit().putBoolean(HIDE_VALUES_KEY, shouldHide).apply()
                     }
                 )
             }
@@ -60,7 +69,9 @@ class ContaiShellActivity : ComponentActivity() {
 @Composable
 private fun ContaiShell(
     themeMode: AppThemeMode,
-    onThemeModeChange: (AppThemeMode) -> Unit
+    onThemeModeChange: (AppThemeMode) -> Unit,
+    hideValues: Boolean,
+    onHideValuesChange: (Boolean) -> Unit
 ) {
     val destinations = listOf(
         ContaiDestination.HOME,
@@ -129,7 +140,9 @@ private fun ContaiShell(
                 )
                 ContaiDestination.PROFILE -> ProfileScreen(
                     themeMode = themeMode,
-                    onThemeModeChange = onThemeModeChange
+                    onThemeModeChange = onThemeModeChange,
+                    hideValues = hideValues,
+                    onHideValuesChange = onHideValuesChange
                 )
             }
         }
