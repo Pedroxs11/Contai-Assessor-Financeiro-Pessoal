@@ -855,8 +855,41 @@ fun ContaiApp() {
                             Column(
                                 modifier = Modifier.padding(16.dp)
                             ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = transaction.category,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+
+                                    Text(
+                                        text = amountText,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
                                 Text(
-                                    text = "$amountText\n${transaction.type} • ${transaction.category}\n$statusText\n${friendlyAppName(transaction.source)}\n$dateText"
+                                    text = friendlyAppName(transaction.source),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    text = "${transaction.type} • $statusText",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                Text(
+                                    text = dateText,
+                                    style = MaterialTheme.typography.bodySmall
                                 )
 
                                 if (transaction.status == "POSSIVEL") {
