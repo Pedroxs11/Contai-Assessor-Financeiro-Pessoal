@@ -9,11 +9,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -65,6 +72,8 @@ fun TransactionHistoryCard(
     onCorrect: (TransactionRecord) -> Unit,
     onIgnore: (Long) -> Unit
 ) {
+    var menuExpanded by remember(transaction.timestamp) { mutableStateOf(false) }
+
     Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         val amountText = transaction.amount?.let { formatCurrency(it) } ?: "Valor não identificado"
         val statusText = when (transaction.status) {
@@ -76,7 +85,16 @@ fun TransactionHistoryCard(
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(transaction.category, style = MaterialTheme.typography.titleMedium)
-                Text(amountText, style = MaterialTheme.typography.titleMedium, color = when (transaction.type) { "ENTRADA" -> MaterialTheme.colorScheme.secondary; "DESPESA" -> MaterialTheme.colorScheme.error; else -> MaterialTheme.colorScheme.onSurface })
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(amountText, style = MaterialTheme.typography.titleMedium, color = when (transaction.type) { "ENTRADA" -> MaterialTheme.colorScheme.secondary; "DESPESA" -> MaterialTheme.colorScheme.error; else -> MaterialTheme.colorScheme.onSurface })
+                    if (transaction.status == "CONFIRMADA") {
+                        IconButton(onClick = { menuExpanded = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
+                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            DropdownMenuItem(text = { Text("Editar") }, onClick = { menuExpanded = false })
+                            DropdownMenuItem(text = { Text("Excluir") }, onClick = { menuExpanded = false })
+                        }
+                    }
+                }
             }
             Spacer(Modifier.height(6.dp)); Text(friendlyAppName(transaction.source), style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(8.dp)); Text("${transaction.type} • $statusText", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
