@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.contai.financeiro.ui.theme.AppThemeMode
+import org.json.JSONArray
 
 @Composable
 fun ProfileScreen(
@@ -41,6 +42,8 @@ fun ProfileScreen(
     var showCategories by remember { mutableStateOf(false) }
     var categoryType by remember { mutableStateOf("DESPESA") }
     var newCategoryName by remember { mutableStateOf("") }
+    var categoryToRename by remember { mutableStateOf("") }
+    var renamedCategoryName by remember { mutableStateOf("") }
     var customIncomeCategories by remember {
         mutableStateOf(transactionPrefs.getStringSet("custom_income_categories", emptySet())?.toList()?.sorted().orEmpty())
     }
@@ -61,6 +64,33 @@ fun ProfileScreen(
             customExpenseCategories = updated
         }
         newCategoryName = ""
+    }
+
+    fun renameCategory() {
+        val oldName = categoryToRename.trim()
+        val newName = renamedCategoryName.trim()
+        if (oldName.isBlank() || newName.isBlank() || oldName == newName) return
+
+        if (oldName in customIncomeCategories) {
+            val updated = customIncomeCategories.map { if (it == oldName) newName else it }.distinct().sorted()
+            transactionPrefs.edit().putStringSet("custom_income_categories", updated.toSet()).apply()
+            customIncomeCategories = updated
+        }
+        if (oldName in customExpenseCategories) {
+            val updated = customExpenseCategories.map { if (it == oldName) newName else it }.distinct().sorted()
+            transactionPrefs.edit().putStringSet("custom_expense_categories", updated.toSet()).apply()
+            customExpenseCategories = updated
+        }
+
+        val historyJson = JSONArray(transactionPrefs.getString("transaction_history", "[]") ?: "[]")
+        for (i in 0 until historyJson.length()) {
+            val item = historyJson.getJSONObject(i)
+            if (item.optString("category") == oldName) item.put("category", newName)
+        }
+        transactionPrefs.edit().putString("transaction_history", historyJson.toString()).apply()
+
+        categoryToRename = ""
+        renamedCategoryName = ""
     }
 
     Column(
@@ -153,6 +183,7 @@ fun ProfileScreen(
                             .distinct().joinToString(" • "),
                         style = MaterialTheme.typography.bodyMedium
                     )
+
                     Spacer(Modifier.height(16.dp))
                     Text("Nova categoria", style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(8.dp))
@@ -189,9 +220,45 @@ fun ProfileScreen(
                     ) {
                         Text("Adicionar categoria")
                     }
+
+                    val editableCategories = (customIncomeCategories + customExpenseCategories).distinct().sorted()
+                    if (editableCategories.isNotEmpty()) {
+                        Spacer(Modifier.height(18.dp))
+                        Text("Renomear categoria personalizada", style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.height(8.dp))
+                        editableCategories.forEach { category ->
+                            FilterChip(
+                                selected = categoryToRename == category,
+                                onClick = {
+                                    categoryToRename = category
+                                    renamedCategoryName = category
+                                },
+                                label = { Text(category) }
+                            )
+                        }
+                        if (categoryToRename.isNotBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = renamedCategoryName,
+                                onValueChange = { renamedCategoryName = it },
+                                label = { Text("Novo nome") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick = { renameCategory() },
+                                enabled = renamedCategoryName.isNotBlank() && renamedCategoryName.trim() != categoryToRename,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Renomear")
+                            }
+                        }
+                    }
+
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "As categorias padrão são protegidas. As personalizadas poderão ser editadas ou excluídas.",
+                        "As categorias padrão são protegidas. Ao renomear uma categoria personalizada, os lançamentos existentes também são atualizados.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
