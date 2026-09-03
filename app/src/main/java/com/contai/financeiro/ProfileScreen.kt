@@ -11,8 +11,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,6 +28,8 @@ fun ProfileScreen(
     themeMode: AppThemeMode,
     onThemeModeChange: (AppThemeMode) -> Unit
 ) {
+    var hideValues by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -75,7 +82,31 @@ fun ProfileScreen(
 
         SettingsCard("Categorias", "Gerencie suas categorias de entradas e despesas")
         SettingsCard("Captura automática", "Permissão, status e diagnóstico")
-        SettingsCard("Privacidade", "Preferências para exibição dos valores")
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Ocultar valores", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Esconde valores financeiros ao abrir o aplicativo.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = hideValues,
+                    onCheckedChange = { hideValues = it }
+                )
+            }
+        }
+
         SettingsCard("Dados", "Gerencie os dados financeiros salvos no aparelho")
         SettingsCard("Sobre", "Versão e informações do Contai")
     }
