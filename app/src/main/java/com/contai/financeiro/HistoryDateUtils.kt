@@ -44,12 +44,16 @@ fun GroupedHistoryTransactions(
     transactions: List<TransactionRecord>,
     onConfirm: (Long) -> Unit,
     onCorrect: (TransactionRecord) -> Unit,
-    onIgnore: (Long) -> Unit
+    onIgnore: (Long) -> Unit,
+    showDateGroups: Boolean = true
 ) {
     var previousGroup: String? = null
     transactions.sortedByDescending { it.timestamp }.forEach { transaction ->
         val group = historyDateGroup(transaction.timestamp)
-        if (group != previousGroup) { HistoryDateHeader(group); previousGroup = group }
+        if (showDateGroups && group != previousGroup) {
+            HistoryDateHeader(group)
+            previousGroup = group
+        }
         TransactionHistoryCard(transaction, onConfirm, onCorrect, onIgnore)
     }
 }
