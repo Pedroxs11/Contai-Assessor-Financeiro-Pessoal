@@ -1,16 +1,22 @@
 package com.contai.financeiro
 
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -41,42 +47,73 @@ fun ReportsScreen(hideValues: Boolean) {
     fun valueText(value: Double): String = if (hideValues) "R$ ••••" else formatCurrency(value)
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Relatórios", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            "Visão geral dos seus lançamentos confirmados.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text("Visão geral dos seus lançamentos confirmados.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ReportCard("Entradas", valueText(income), Modifier.weight(1f))
             ReportCard("Despesas", valueText(expenses), Modifier.weight(1f))
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ReportCard("Saldo", valueText(income - expenses), Modifier.weight(1f))
             ReportCard("Proventos", valueText(proceeds), Modifier.weight(1f))
         }
 
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Próximo passo", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Aqui entraremos com gráficos de entradas x despesas, categorias e evolução do saldo.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+        IncomeExpenseChart(income = income, expenses = expenses, hideValues = hideValues)
+    }
+}
+
+@Composable
+private fun IncomeExpenseChart(income: Double, expenses: Double, hideValues: Boolean) {
+    val maxValue = maxOf(income, expenses, 1.0)
+    val incomeRatio = (income / maxValue).toFloat().coerceIn(0f, 1f)
+    val expenseRatio = (expenses / maxValue).toFloat().coerceIn(0f, 1f)
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("Entradas × Despesas", style = MaterialTheme.typography.titleMedium)
+            Text("Comparativo dos lançamentos confirmados.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            ChartBar(
+                label = "Entradas",
+                ratio = incomeRatio,
+                value = if (hideValues) "R$ ••••" else formatCurrency(income),
+                usePrimary = true
+            )
+            ChartBar(
+                label = "Despesas",
+                ratio = expenseRatio,
+                value = if (hideValues) "R$ ••••" else formatCurrency(expenses),
+                usePrimary = false
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChartBar(label: String, ratio: Float, value: String, usePrimary: Boolean) {
+    val barColor = if (usePrimary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.labelLarge)
+            Text(value, style = MaterialTheme.typography.labelLarge)
+        }
+        Box(
+            modifier = Modifier.fillMaxWidth().height(12.dp).background(
+                MaterialTheme.colorScheme.surfaceVariant,
+                RoundedCornerShape(999.dp)
+            ),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(ratio)
+                    .height(12.dp)
+                    .background(barColor, RoundedCornerShape(999.dp))
+            )
         }
     }
 }
