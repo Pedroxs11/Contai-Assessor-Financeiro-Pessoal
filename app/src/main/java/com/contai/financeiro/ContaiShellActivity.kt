@@ -129,7 +129,7 @@ private fun ContaiShell(
                 }
         ) {
             when (selectedDestination) {
-                ContaiDestination.HOME -> ContaiApp()
+                ContaiDestination.HOME -> ContaiApp(hideValuesByDefault = hideValues)
                 ContaiDestination.AGENDA -> DestinationPlaceholder(
                     title = "Agenda",
                     description = "Seus compromissos e lembretes ficarão aqui."
