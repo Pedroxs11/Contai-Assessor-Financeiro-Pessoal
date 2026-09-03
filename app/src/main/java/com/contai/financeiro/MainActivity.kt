@@ -20,9 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.json.JSONArray
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import com.contai.financeiro.ui.theme.ContaiTheme
 
 class MainActivity : ComponentActivity() {
@@ -199,6 +196,16 @@ fun ContaiApp() {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { if (selectedSection == "PENDENCIAS") Button({ selectedSection = "PENDENCIAS" }, modifier = Modifier.weight(1f)) { Text("Pendências") } else OutlinedButton({ selectedSection = "PENDENCIAS" }, modifier = Modifier.weight(1f)) { Text("Pendências") }; if (selectedSection == "HISTORICO") Button({ selectedSection = "HISTORICO" }, modifier = Modifier.weight(1f)) { Text("Histórico") } else OutlinedButton({ selectedSection = "HISTORICO" }, modifier = Modifier.weight(1f)) { Text("Histórico") } }; Spacer(modifier = Modifier.height(16.dp))
         if (selectedSection == "HISTORICO") { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { FilterChip(historyFilter == "TODOS", { historyFilter = "TODOS" }, label = { Text("Todos") }, modifier = Modifier.weight(1f)); FilterChip(historyFilter == "ENTRADAS", { historyFilter = "ENTRADAS" }, label = { Text("Entradas") }, modifier = Modifier.weight(1f)) }; Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { FilterChip(historyFilter == "DESPESAS", { historyFilter = "DESPESAS" }, label = { Text("Despesas") }, modifier = Modifier.weight(1f)); FilterChip(historyFilter == "PROVENTOS", { historyFilter = "PROVENTOS" }, label = { Text("Proventos") }, modifier = Modifier.weight(1f)) }; Spacer(modifier = Modifier.height(8.dp)) }
         val displayedTransactions = if (selectedSection == "PENDENCIAS") transactionHistory.filter { it.status == "POSSIVEL" } else { val confirmed = transactionHistory.filter { it.status == "CONFIRMADA" }; when (historyFilter) { "ENTRADAS" -> confirmed.filter { it.type == "ENTRADA" && it.investmentType.isBlank() }; "DESPESAS" -> confirmed.filter { it.type == "DESPESA" }; "PROVENTOS" -> confirmed.filter { it.investmentType.isNotBlank() }; else -> confirmed } }
-        if (displayedTransactions.isEmpty()) Text(if (selectedSection == "PENDENCIAS") "Nenhuma transação pendente." else "Nenhuma transação encontrada neste filtro.") else displayedTransactions.forEach { transaction -> Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) { val amountText = transaction.amount?.let { formatCurrency(it) } ?: "Valor não identificado"; val statusText = when (transaction.status) { "CONFIRMADA" -> "Confirmada"; "POSSIVEL" -> "Aguardando confirmação"; else -> transaction.status.ifBlank { "Não identificado" } }; val dateText = if (transaction.timestamp > 0L) SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(transaction.timestamp)) else "Data não disponível"; Column(modifier = Modifier.padding(16.dp)) { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(transaction.category, style = MaterialTheme.typography.titleMedium); Text(amountText, style = MaterialTheme.typography.titleMedium, color = when (transaction.type) { "ENTRADA" -> MaterialTheme.colorScheme.secondary; "DESPESA" -> MaterialTheme.colorScheme.error; else -> MaterialTheme.colorScheme.onSurface }) }; Spacer(modifier = Modifier.height(6.dp)); Text(friendlyAppName(transaction.source), style = MaterialTheme.typography.bodyMedium); Spacer(modifier = Modifier.height(8.dp)); Text("${transaction.type} • $statusText", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(modifier = Modifier.height(6.dp)); Text(dateText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); if (transaction.status == "POSSIVEL") { Spacer(modifier = Modifier.height(12.dp)); Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button({ confirmTransaction(transaction.timestamp) }, modifier = Modifier.weight(1f)) { Text("Confirmar") }; OutlinedButton({ transactionToCorrect = transaction }, modifier = Modifier.weight(1f)) { Text("Corrigir") } }; Spacer(modifier = Modifier.height(8.dp)); TextButton({ ignoreTransaction(transaction.timestamp) }, modifier = Modifier.fillMaxWidth()) { Text("Ignorar") } } } } }
+        if (displayedTransactions.isEmpty()) {
+            Text(if (selectedSection == "PENDENCIAS") "Nenhuma transação pendente." else "Nenhuma transação encontrada neste filtro.")
+        } else {
+            GroupedHistoryTransactions(
+                transactions = displayedTransactions,
+                onConfirm = { confirmTransaction(it) },
+                onCorrect = { transactionToCorrect = it },
+                onIgnore = { ignoreTransaction(it) },
+                showDateGroups = selectedSection == "HISTORICO"
+            )
+        }
     } } }
 }
