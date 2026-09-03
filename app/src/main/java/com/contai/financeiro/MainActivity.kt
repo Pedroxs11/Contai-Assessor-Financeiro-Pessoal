@@ -48,7 +48,7 @@ fun parseBrazilianAmount(value: String): Double? = value
     .toDoubleOrNull()
 
 @Composable
-fun ContaiApp() {
+fun ContaiApp(hideValuesByDefault: Boolean = false) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var lastPackage by remember { mutableStateOf("") }
@@ -73,11 +73,15 @@ fun ContaiApp() {
     var selectedSection by remember { mutableStateOf("PENDENCIAS") }
     var historyFilter by remember { mutableStateOf("TODOS") }
     var showManualEntryDialog by remember { mutableStateOf(false) }
-    var showValues by remember { mutableStateOf(true) }
+    var showValues by remember { mutableStateOf(!hideValuesByDefault) }
     var manualType by remember { mutableStateOf("DESPESA") }
     var manualAmount by remember { mutableStateOf("") }
     var manualCategory by remember { mutableStateOf("Outros") }
     var manualDescription by remember { mutableStateOf("") }
+
+    LaunchedEffect(hideValuesByDefault) {
+        showValues = !hideValuesByDefault
+    }
 
     fun addCustomCategory(name: String, type: String) {
         val cleanName = name.trim()
