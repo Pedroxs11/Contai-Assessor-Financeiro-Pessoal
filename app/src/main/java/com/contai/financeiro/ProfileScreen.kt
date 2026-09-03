@@ -9,15 +9,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.contai.financeiro.ui.theme.AppThemeMode
 
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(
+    themeMode: AppThemeMode,
+    onThemeModeChange: (AppThemeMode) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -31,7 +36,43 @@ fun ProfileScreen() {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(4.dp))
-        SettingsCard("Aparência", "Sistema, claro ou escuro")
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Aparência", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Escolha como o Contai deve aparecer.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = themeMode == AppThemeMode.SYSTEM,
+                        onClick = { onThemeModeChange(AppThemeMode.SYSTEM) },
+                        label = { Text("Sistema") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = themeMode == AppThemeMode.LIGHT,
+                        onClick = { onThemeModeChange(AppThemeMode.LIGHT) },
+                        label = { Text("Claro") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = themeMode == AppThemeMode.DARK,
+                        onClick = { onThemeModeChange(AppThemeMode.DARK) },
+                        label = { Text("Escuro") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+
         SettingsCard("Categorias", "Gerencie suas categorias de entradas e despesas")
         SettingsCard("Captura automática", "Permissão, status e diagnóstico")
         SettingsCard("Privacidade", "Preferências para exibição dos valores")
