@@ -44,6 +44,7 @@ fun friendlyAppName(packageName: String): String {
         "com.nu.production" -> "Nubank"
         "com.santander.app" -> "Santander"
         "br.com.digio.uber" -> "Uber Conta"
+        "manual" -> "Lançamento manual"
         else -> packageName
     }
 }
@@ -210,52 +211,24 @@ fun ContaiApp() {
         System.currentTimeMillis() - listenerLastAliveAt <= 45_000
 
     fun ignoreTransaction(timestamp: Long) {
-        val prefs = context.getSharedPreferences(
-            "contai_notifications",
-            Context.MODE_PRIVATE
-        )
-
-        val historyJson = JSONArray(
-            prefs.getString("transaction_history", "[]") ?: "[]"
-        )
-
+        val prefs = context.getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
+        val historyJson = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
         for (i in 0 until historyJson.length()) {
             val item = historyJson.getJSONObject(i)
-
             if (item.optLong("timestamp", 0L) == timestamp) {
                 item.put("classification", "IGNORADA")
                 break
             }
         }
-
-        prefs.edit()
-            .putString("transaction_history", historyJson.toString())
-            .apply()
-
+        prefs.edit().putString("transaction_history", historyJson.toString()).apply()
         refreshData()
     }
 
     fun saveManualTransaction() {
-        val normalizedAmount = manualAmount
-            .trim()
-            .replace("R$", "", ignoreCase = true)
-            .replace(" ", "")
-            .replace(".", "")
-            .replace(",", ".")
-
-        val amount = normalizedAmount
-            .toDoubleOrNull()
-            ?: return
-
-        val prefs = context.getSharedPreferences(
-            "contai_notifications",
-            Context.MODE_PRIVATE
-        )
-
-        val historyJson = JSONArray(
-            prefs.getString("transaction_history", "[]") ?: "[]"
-        )
-
+        val normalizedAmount = manualAmount.trim().replace("R$", "", ignoreCase = true).replace(" ", "").replace(".", "").replace(",", ".")
+        val amount = normalizedAmount.toDoubleOrNull() ?: return
+        val prefs = context.getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
+        val historyJson = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
         val item = org.json.JSONObject()
             .put("timestamp", System.currentTimeMillis())
             .put("package", "MANUAL")
@@ -266,45 +239,27 @@ fun ContaiApp() {
             .put("confidence", 100)
             .put("classification", "CONFIRMADA")
             .put("amount", amount)
-
         historyJson.put(item)
-
-        prefs.edit()
-            .putString("transaction_history", historyJson.toString())
-            .apply()
-
+        prefs.edit().putString("transaction_history", historyJson.toString()).apply()
         manualAmount = ""
         manualDescription = ""
         manualType = "DESPESA"
         manualCategory = "Outros"
         showManualEntryDialog = false
-
         refreshData()
     }
 
     fun confirmTransaction(timestamp: Long) {
-        val prefs = context.getSharedPreferences(
-            "contai_notifications",
-            Context.MODE_PRIVATE
-        )
-
-        val historyJson = JSONArray(
-            prefs.getString("transaction_history", "[]") ?: "[]"
-        )
-
+        val prefs = context.getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
+        val historyJson = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
         for (i in 0 until historyJson.length()) {
             val item = historyJson.getJSONObject(i)
-
             if (item.optLong("timestamp", 0L) == timestamp) {
                 item.put("classification", "CONFIRMADA")
                 break
             }
         }
-
-        prefs.edit()
-            .putString("transaction_history", historyJson.toString())
-            .apply()
-
+        prefs.edit().putString("transaction_history", historyJson.toString()).apply()
         refreshData()
     }
 
@@ -314,721 +269,209 @@ fun ContaiApp() {
         var selectedCategory by remember(transaction.timestamp) { mutableStateOf(transaction.category) }
 
         AlertDialog(
-            onDismissRequest = {
-                transactionToCorrect = null
-            },
-            title = {
-                Text("Corrigir transação")
-            },
+            onDismissRequest = { transactionToCorrect = null },
+            title = { Text("Corrigir transação") },
             text = {
-                Column(
-                    modifier = Modifier
-                        .heightIn(max = 450.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Text("Valor: R$ ${transaction.amount ?: 0.0}")
+                Column(modifier = Modifier.heightIn(max = 450.dp).verticalScroll(rememberScrollState())) {
+                    Text("Valor: ${formatCurrency(transaction.amount ?: 0.0)}")
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("Tipo")
-
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = selectedType == "ENTRADA",
-                            onClick = { selectedType = "ENTRADA" },
-                            label = { Text("Entrada") }
-                        )
-
-                        FilterChip(
-                            selected = selectedType == "DESPESA",
-                            onClick = { selectedType = "DESPESA" },
-                            label = { Text("Despesa") }
-                        )
+                        FilterChip(selected = selectedType == "ENTRADA", onClick = { selectedType = "ENTRADA" }, label = { Text("Entrada") })
+                        FilterChip(selected = selectedType == "DESPESA", onClick = { selectedType = "DESPESA" }, label = { Text("Despesa") })
                     }
-
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("Categoria")
-
-                    val categories = if (selectedType == "ENTRADA") {
-                        listOf("Salário", "Pix recebido", "Outros") + customIncomeCategories
-                    } else {
-                        listOf(
-                            "Alimentação",
-                            "Transporte",
-                            "Combustível",
-                            "Moradia",
-                            "Saúde",
-                            "Compras",
-                            "Lazer",
-                            "Outros"
-                        ) + customExpenseCategories
-                    }
-
+                    val categories = if (selectedType == "ENTRADA") listOf("Salário", "Pix recebido", "Outros") + customIncomeCategories else listOf("Alimentação", "Transporte", "Combustível", "Moradia", "Saúde", "Compras", "Lazer", "Outros") + customExpenseCategories
                     categories.forEach { category ->
-                        FilterChip(
-                            selected = selectedCategory == category,
-                            onClick = {
-                                selectedCategory = category
-                            },
-                            label = {
-                                Text(category)
-                            }
-                        )
+                        FilterChip(selected = selectedCategory == category, onClick = { selectedCategory = category }, label = { Text(category) })
                     }
-
                     Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedTextField(
-                        value = newCategoryName,
-                        onValueChange = { newCategoryName = it },
-                        label = { Text("Nova categoria") },
-                        singleLine = true
-                    )
-
+                    OutlinedTextField(value = newCategoryName, onValueChange = { newCategoryName = it }, label = { Text("Nova categoria") }, singleLine = true)
                     Spacer(modifier = Modifier.height(8.dp))
-
-                    Button(
-                        onClick = {
-                            val name = newCategoryName.trim()
-                            if (name.isNotBlank()) {
-                                addCustomCategory(name, selectedType)
-                                selectedCategory = name
-                                newCategoryName = ""
-                            }
+                    Button(onClick = {
+                        val name = newCategoryName.trim()
+                        if (name.isNotBlank()) {
+                            addCustomCategory(name, selectedType)
+                            selectedCategory = name
+                            newCategoryName = ""
                         }
-                    ) {
-                        Text("Adicionar categoria")
-                    }
-
+                    }) { Text("Adicionar categoria") }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("Origem: ${friendlyAppName(transaction.source)}")
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        val typedCategory = newCategoryName.trim()
-
-                        if (typedCategory.isNotBlank()) {
-                            addCustomCategory(typedCategory, selectedType)
-                            selectedCategory = typedCategory
-                            newCategoryName = ""
-                        }
-
-                        val prefs = context.getSharedPreferences(
-                            "contai_notifications",
-                            Context.MODE_PRIVATE
-                        )
-
-                        val historyJson = JSONArray(
-                            prefs.getString("transaction_history", "[]") ?: "[]"
-                        )
-
-                        for (i in 0 until historyJson.length()) {
-                            val item = historyJson.getJSONObject(i)
-
-                            if (item.optLong("timestamp", 0L) == transaction.timestamp) {
-                                item.put("type", selectedType)
-                                item.put("category", selectedCategory)
-                                item.put("classification", "CONFIRMADA")
-
-                                val normalizedLearningText =
-                                    transaction.text
-                                        .lowercase()
-                                        .replace(
-                                            Regex("""r\$\s*[0-9.]+,[0-9]{2}"""),
-                                            "r$ valor"
-                                        )
-                                        .replace(Regex("""\s+"""), " ")
-                                        .trim()
-
-                                val learningKey =
-                                    "${transaction.source}|${transaction.title}|$normalizedLearningText"
-                                        .lowercase()
-                                        .trim()
-
-                                prefs.edit()
-                                    .putString(
-                                        "learned_$learningKey",
-                                        "$selectedType|$selectedCategory"
-                                    )
-                                    .apply()
-
-                                break
-                            }
-                        }
-
-                        prefs.edit()
-                            .putString("transaction_history", historyJson.toString())
-                            .apply()
-
-                        transactionToCorrect = null
-                        refreshData()
+                Button(onClick = {
+                    val typedCategory = newCategoryName.trim()
+                    if (typedCategory.isNotBlank()) {
+                        addCustomCategory(typedCategory, selectedType)
+                        selectedCategory = typedCategory
+                        newCategoryName = ""
                     }
-                ) {
-                    Text("Continuar")
-                }
+                    val prefs = context.getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
+                    val historyJson = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
+                    for (i in 0 until historyJson.length()) {
+                        val item = historyJson.getJSONObject(i)
+                        if (item.optLong("timestamp", 0L) == transaction.timestamp) {
+                            item.put("type", selectedType)
+                            item.put("category", selectedCategory)
+                            item.put("classification", "CONFIRMADA")
+                            val normalizedLearningText = transaction.text.lowercase().replace(Regex("""r\$\s*[0-9.]+,[0-9]{2}"""), "r$ valor").replace(Regex("""\s+"""), " ").trim()
+                            val learningKey = "${transaction.source}|${transaction.title}|$normalizedLearningText".lowercase().trim()
+                            prefs.edit().putString("learned_$learningKey", "$selectedType|$selectedCategory").apply()
+                            break
+                        }
+                    }
+                    prefs.edit().putString("transaction_history", historyJson.toString()).apply()
+                    transactionToCorrect = null
+                    refreshData()
+                }) { Text("Continuar") }
             },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        transactionToCorrect = null
-                    }
-                ) {
-                    Text("Cancelar")
-                }
-            }
+            dismissButton = { TextButton(onClick = { transactionToCorrect = null }) { Text("Cancelar") } }
         )
     }
 
     LaunchedEffect(Unit) {
-        NotificationListenerService.requestRebind(
-            ComponentName(
-                context,
-                FinanceNotificationListener::class.java
-            )
-        )
-
+        NotificationListenerService.requestRebind(ComponentName(context, FinanceNotificationListener::class.java))
         delay(2500)
         refreshData()
     }
 
     if (showManualEntryDialog) {
         AlertDialog(
-            onDismissRequest = {
-                showManualEntryDialog = false
-            },
-            title = {
-                Text("Adicionar manualmente")
-            },
+            onDismissRequest = { showManualEntryDialog = false },
+            title = { Text("Adicionar manualmente") },
             text = {
-                Column(
-                    modifier = Modifier
-                        .heightIn(max = 450.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
+                Column(modifier = Modifier.heightIn(max = 450.dp).verticalScroll(rememberScrollState())) {
                     Text("Tipo")
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilterChip(
-                            selected = manualType == "ENTRADA",
-                            onClick = {
-                                manualType = "ENTRADA"
-                                manualCategory = "Receitas"
-                            },
-                            label = { Text("Entrada") }
-                        )
-
-                        FilterChip(
-                            selected = manualType == "DESPESA",
-                            onClick = {
-                                manualType = "DESPESA"
-                                manualCategory = "Outros"
-                            },
-                            label = { Text("Despesa") }
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = manualType == "ENTRADA", onClick = { manualType = "ENTRADA"; manualCategory = "Receitas" }, label = { Text("Entrada") })
+                        FilterChip(selected = manualType == "DESPESA", onClick = { manualType = "DESPESA"; manualCategory = "Outros" }, label = { Text("Despesa") })
                     }
-
                     Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedTextField(
-                        value = manualAmount,
-                        onValueChange = { manualAmount = it },
-                        label = { Text("Valor") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
+                    OutlinedTextField(value = manualAmount, onValueChange = { manualAmount = it }, label = { Text("Valor") }, modifier = Modifier.fillMaxWidth())
                     Spacer(modifier = Modifier.height(12.dp))
-
                     Text("Categoria")
-
-                    val manualCategories =
-                        if (manualType == "ENTRADA") {
-                            listOf(
-                                "Receitas",
-                                "Salário",
-                                "Pix recebido",
-                                "Outros"
-                            ) + customIncomeCategories
-                        } else {
-                            listOf(
-                                "Alimentação",
-                                "Transporte",
-                                "Combustível",
-                                "Moradia",
-                                "Saúde",
-                                "Compras",
-                                "Lazer",
-                                "Outros"
-                            ) + customExpenseCategories
-                        }
-
-                    manualCategories
-                        .distinct()
-                        .forEach { category ->
-                            FilterChip(
-                                selected = manualCategory == category,
-                                onClick = {
-                                    manualCategory = category
-                                },
-                                label = {
-                                    Text(category)
-                                }
-                            )
-                        }
-
+                    val manualCategories = if (manualType == "ENTRADA") listOf("Receitas", "Salário", "Pix recebido", "Outros") + customIncomeCategories else listOf("Alimentação", "Transporte", "Combustível", "Moradia", "Saúde", "Compras", "Lazer", "Outros") + customExpenseCategories
+                    manualCategories.distinct().forEach { category ->
+                        FilterChip(selected = manualCategory == category, onClick = { manualCategory = category }, label = { Text(category) })
+                    }
                     Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedTextField(
-                        value = manualDescription,
-                        onValueChange = { manualDescription = it },
-                        label = { Text("Descrição") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    OutlinedTextField(value = manualDescription, onValueChange = { manualDescription = it }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth())
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        saveManualTransaction()
-                    },
-                    enabled = manualAmount
-                        .replace(",", ".")
-                        .toDoubleOrNull() != null
-                ) {
-                    Text("Salvar")
-                }
+                Button(onClick = { saveManualTransaction() }, enabled = manualAmount.replace(",", ".").toDoubleOrNull() != null) { Text("Salvar") }
             },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showManualEntryDialog = false
-                    }
-                ) {
-                    Text("Cancelar")
-                }
-            }
+            dismissButton = { TextButton(onClick = { showManualEntryDialog = false }) { Text("Cancelar") } }
         )
     }
 
     MaterialTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(24.dp)
-            ) {
-
-                Text(
-                    text = "Contai",
-                    style = MaterialTheme.typography.headlineLarge
-                )
-
+        Surface(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
+                Text(text = "Contai", style = MaterialTheme.typography.headlineLarge)
                 Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "Seu dinheiro, mais claro.",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-
+                Text(text = "Seu dinheiro, mais claro.", style = MaterialTheme.typography.bodyLarge)
                 Spacer(modifier = Modifier.height(20.dp))
-
-                Button(
-                    onClick = {
-                        showManualEntryDialog = true
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("+ Adicionar lançamento")
-                }
-
+                Button(onClick = { showManualEntryDialog = true }, modifier = Modifier.fillMaxWidth()) { Text("+ Adicionar lançamento") }
                 Spacer(modifier = Modifier.height(24.dp))
-
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
-                            Text(
-                                text = when {
-                                    !notificationAccess -> "Captura sem permissão"
-                                    listenerHealthy -> "Captura ativa"
-                                    else -> "Captura interrompida"
-                                },
-                                style = MaterialTheme.typography.titleMedium
-                            )
-
+                            Text(text = when { !notificationAccess -> "Captura sem permissão"; listenerHealthy -> "Captura ativa"; else -> "Captura interrompida" }, style = MaterialTheme.typography.titleMedium)
                             Spacer(modifier = Modifier.height(4.dp))
-
-                            Text(
-                                text = when {
-                                    !notificationAccess ->
-                                        "Ative o acesso às notificações"
-                                    listenerHealthy ->
-                                        "O Contai está acompanhando suas notificações"
-                                    else ->
-                                        "A captura automática precisa de atenção"
-                                },
-                                style = MaterialTheme.typography.bodyMedium
-                            )
+                            Text(text = when { !notificationAccess -> "Ative o acesso às notificações"; listenerHealthy -> "O Contai está acompanhando suas notificações"; else -> "A captura automática precisa de atenção" }, style = MaterialTheme.typography.bodyMedium)
                         }
-
-                        Text(
-                            text = when {
-                                !notificationAccess -> "⚠️"
-                                listenerHealthy -> "●"
-                                else -> "⚠️"
-                            },
-                            style = MaterialTheme.typography.titleLarge
-                        )
+                        Text(text = when { !notificationAccess -> "⚠️"; listenerHealthy -> "●"; else -> "⚠️" }, style = MaterialTheme.typography.titleLarge)
                     }
                 }
-
                 Spacer(modifier = Modifier.height(24.dp))
 
-                val confirmedForTotals = transactionHistory.filter {
-                    it.status == "CONFIRMADA"
-                }
-
-                val totalIncome = confirmedForTotals
-                    .filter {
-                        it.type == "ENTRADA" &&
-                        it.investmentType.isBlank()
-                    }
-                    .sumOf { it.amount ?: 0.0 }
-
-                val totalExpense = confirmedForTotals
-                    .filter { it.type == "DESPESA" }
-                    .sumOf { it.amount ?: 0.0 }
-
+                val confirmedForTotals = transactionHistory.filter { it.status == "CONFIRMADA" }
+                val totalIncome = confirmedForTotals.filter { it.type == "ENTRADA" && it.investmentType.isBlank() }.sumOf { it.amount ?: 0.0 }
+                val totalExpense = confirmedForTotals.filter { it.type == "DESPESA" }.sumOf { it.amount ?: 0.0 }
                 val currentMonth = java.util.Calendar.getInstance().apply {
-                    set(java.util.Calendar.DAY_OF_MONTH, 1)
-                    set(java.util.Calendar.HOUR_OF_DAY, 0)
-                    set(java.util.Calendar.MINUTE, 0)
-                    set(java.util.Calendar.SECOND, 0)
-                    set(java.util.Calendar.MILLISECOND, 0)
+                    set(java.util.Calendar.DAY_OF_MONTH, 1); set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
                 }.timeInMillis
-
-                val monthlyProceeds = confirmedForTotals
-                    .filter {
-                        it.investmentType.isNotBlank() &&
-                        it.timestamp >= currentMonth
-                    }
-                    .sumOf { it.amount ?: 0.0 }
-
+                val monthlyProceeds = confirmedForTotals.filter { it.investmentType.isNotBlank() && it.timestamp >= currentMonth }.sumOf { it.amount ?: 0.0 }
                 val balance = totalIncome - totalExpense
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Saldo atual",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-
-                            TextButton(
-                                onClick = { showValues = !showValues }
-                            ) {
-                                Text(if (showValues) "👁" else "🙈")
-                            }
+                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "Saldo atual", style = MaterialTheme.typography.titleMedium)
+                            TextButton(onClick = { showValues = !showValues }) { Text(if (showValues) "👁" else "🙈") }
                         }
-
                         Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = if (showValues) {
-                                "R$ " + String.format(Locale.getDefault(), "%.2f", balance)
-                            } else {
-                                "R$ ••••••"
-                            },
-                            style = MaterialTheme.typography.headlineMedium
-                        )
+                        Text(text = if (showValues) formatCurrency(balance) else "R$ ••••••", style = MaterialTheme.typography.headlineMedium)
                     }
                 }
-
                 Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        colors = CardDefaults.cardColors(
-                            containerColor = androidx.compose.ui.graphics.Color(0xFFEAF3FF)
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            Text("Entradas")
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = if (showValues) {
-                                    "R$ " + String.format(Locale.getDefault(), "%.2f", totalIncome)
-                                } else {
-                                    "R$ ••••••"
-                                },
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Card(modifier = Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Entradas"); Spacer(modifier = Modifier.height(6.dp))
+                            Text(text = if (showValues) formatCurrency(totalIncome) else "R$ ••••••", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
                         }
                     }
-
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        colors = CardDefaults.cardColors(
-                            containerColor = androidx.compose.ui.graphics.Color(0xFFFFEEEE)
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            Text("Despesas")
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = if (showValues) {
-                                    "R$ " + String.format(Locale.getDefault(), "%.2f", totalExpense)
-                                } else {
-                                    "R$ ••••••"
-                                },
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.tertiary
-                            )
+                    Card(modifier = Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Despesas"); Spacer(modifier = Modifier.height(6.dp))
+                            Text(text = if (showValues) formatCurrency(totalExpense) else "R$ ••••••", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
-
                 Spacer(modifier = Modifier.height(12.dp))
-
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
-                            Text(
-                                text = "Proventos do mês",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = if (showValues) {
-                                    "R$ " + String.format(
-                                        Locale.getDefault(),
-                                        "%.2f",
-                                        monthlyProceeds
-                                    )
-                                } else {
-                                    "R$ ••••••"
-                                },
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Text(text = "Proventos do mês", style = MaterialTheme.typography.bodyMedium); Spacer(modifier = Modifier.height(6.dp))
+                            Text(text = if (showValues) formatCurrency(monthlyProceeds) else "R$ ••••••", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                         }
-
-                        Text(
-                            text = "Investimentos",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text(text = "Investimentos", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-
                 Spacer(modifier = Modifier.height(20.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (selectedSection == "PENDENCIAS") {
-                        Button(
-                            onClick = { selectedSection = "PENDENCIAS" },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Pendências")
-                        }
-                    } else {
-                        OutlinedButton(
-                            onClick = { selectedSection = "PENDENCIAS" },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Pendências")
-                        }
-                    }
-
-                    if (selectedSection == "HISTORICO") {
-                        Button(
-                            onClick = { selectedSection = "HISTORICO" },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Histórico")
-                        }
-                    } else {
-                        OutlinedButton(
-                            onClick = { selectedSection = "HISTORICO" },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Histórico")
-                        }
-                    }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (selectedSection == "PENDENCIAS") Button(onClick = { selectedSection = "PENDENCIAS" }, modifier = Modifier.weight(1f)) { Text("Pendências") } else OutlinedButton(onClick = { selectedSection = "PENDENCIAS" }, modifier = Modifier.weight(1f)) { Text("Pendências") }
+                    if (selectedSection == "HISTORICO") Button(onClick = { selectedSection = "HISTORICO" }, modifier = Modifier.weight(1f)) { Text("Histórico") } else OutlinedButton(onClick = { selectedSection = "HISTORICO" }, modifier = Modifier.weight(1f)) { Text("Histórico") }
                 }
-
                 Spacer(modifier = Modifier.height(16.dp))
-
-                val displayedTransactions = if (selectedSection == "PENDENCIAS") {
-                    transactionHistory.filter { it.status == "POSSIVEL" }
-                } else {
-                    transactionHistory.filter { it.status == "CONFIRMADA" }
-                }
-
+                val displayedTransactions = if (selectedSection == "PENDENCIAS") transactionHistory.filter { it.status == "POSSIVEL" } else transactionHistory.filter { it.status == "CONFIRMADA" }
                 if (displayedTransactions.isEmpty()) {
-                    Text(
-                        if (selectedSection == "PENDENCIAS")
-                            "Nenhuma transação pendente."
-                        else
-                            "Nenhuma transação no histórico."
-                    )
+                    Text(if (selectedSection == "PENDENCIAS") "Nenhuma transação pendente." else "Nenhuma transação no histórico.")
                 } else {
                     displayedTransactions.forEach { transaction ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp)
-                        ) {
-                            val amountText = transaction.amount?.let {
-                                "R$ " + it.toString().replace(".", ",")
-                            } ?: "Valor não identificado"
-
-                            val statusText = when (transaction.status) {
-                                "CONFIRMADA" -> "Confirmada"
-                                "POSSIVEL" -> "Aguardando confirmação"
-                                else -> transaction.status.ifBlank { "Não identificado" }
-                            }
-
-                            val dateText = if (transaction.timestamp > 0L) {
-                                SimpleDateFormat(
-                                    "dd/MM/yyyy HH:mm",
-                                    Locale.getDefault()
-                                ).format(Date(transaction.timestamp))
-                            } else {
-                                "Data não disponível"
-                            }
-
-                            Column(
-                                modifier = Modifier.padding(16.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = transaction.category,
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-
-                                    Text(
-                                        text = amountText,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = when (transaction.type) {
-                                            "ENTRADA" -> MaterialTheme.colorScheme.secondary
-                                            "DESPESA" -> MaterialTheme.colorScheme.tertiary
-                                            else -> MaterialTheme.colorScheme.onSurface
-                                        }
-                                    )
+                        Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                            val amountText = transaction.amount?.let { formatCurrency(it) } ?: "Valor não identificado"
+                            val statusText = when (transaction.status) { "CONFIRMADA" -> "Confirmada"; "POSSIVEL" -> "Aguardando confirmação"; else -> transaction.status.ifBlank { "Não identificado" } }
+                            val dateText = if (transaction.timestamp > 0L) SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(transaction.timestamp)) else "Data não disponível"
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = transaction.category, style = MaterialTheme.typography.titleMedium)
+                                    Text(text = amountText, style = MaterialTheme.typography.titleMedium, color = when (transaction.type) { "ENTRADA" -> MaterialTheme.colorScheme.secondary; "DESPESA" -> MaterialTheme.colorScheme.error; else -> MaterialTheme.colorScheme.onSurface })
                                 }
-
                                 Spacer(modifier = Modifier.height(6.dp))
-
-                                Text(
-                                    text = friendlyAppName(transaction.source),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-
+                                Text(text = friendlyAppName(transaction.source), style = MaterialTheme.typography.bodyMedium)
                                 Spacer(modifier = Modifier.height(8.dp))
-
-                                Text(
-                                    text = "${transaction.type} • $statusText",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-
+                                Text(text = "${transaction.type} • $statusText", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(modifier = Modifier.height(6.dp))
-
-                                Text(
-                                    text = dateText,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-
+                                Text(text = dateText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (transaction.status == "POSSIVEL") {
                                     Spacer(modifier = Modifier.height(12.dp))
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Button(
-                                            onClick = {
-                                                confirmTransaction(transaction.timestamp)
-                                            },
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text("Confirmar")
-                                        }
-
-                                        OutlinedButton(
-                                            onClick = {
-                                                transactionToCorrect = transaction
-                                            },
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text("Corrigir")
-                                        }
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(onClick = { confirmTransaction(transaction.timestamp) }, modifier = Modifier.weight(1f)) { Text("Confirmar") }
+                                        OutlinedButton(onClick = { transactionToCorrect = transaction }, modifier = Modifier.weight(1f)) { Text("Corrigir") }
                                     }
-
                                     Spacer(modifier = Modifier.height(8.dp))
-
-                                    TextButton(
-                                        onClick = {
-                                            ignoreTransaction(transaction.timestamp)
-                                        },
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text("Ignorar")
-                                    }
+                                    TextButton(onClick = { ignoreTransaction(transaction.timestamp) }, modifier = Modifier.fillMaxWidth()) { Text("Ignorar") }
                                 }
                             }
                         }
                     }
                 }
-
             }
         }
     }
