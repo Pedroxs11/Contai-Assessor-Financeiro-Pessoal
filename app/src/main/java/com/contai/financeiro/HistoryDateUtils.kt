@@ -90,7 +90,7 @@ fun TransactionHistoryCard(
                     if (transaction.status == "CONFIRMADA") {
                         IconButton(onClick = { menuExpanded = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                            DropdownMenuItem(text = { Text("Editar") }, onClick = { menuExpanded = false })
+                            DropdownMenuItem(text = { Text("Editar") }, onClick = { menuExpanded = false; onCorrect(transaction) })
                             DropdownMenuItem(text = { Text("Excluir") }, onClick = { menuExpanded = false })
                         }
                     }
