@@ -14,9 +14,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -24,11 +29,16 @@ import androidx.compose.ui.unit.dp
 import org.json.JSONArray
 import java.util.Calendar
 
+private enum class ReportPeriod(val label: String) {
+    MONTH("Este mês"), ALL("Tudo")
+}
+
 @Composable
 fun ReportsScreen(hideValues: Boolean) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
     val history = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
+    var period by remember { mutableStateOf(ReportPeriod.MONTH) }
 
     val monthStart = Calendar.getInstance().apply {
         set(Calendar.DAY_OF_MONTH, 1)
@@ -41,20 +51,18 @@ fun ReportsScreen(hideValues: Boolean) {
     var income = 0.0
     var expenses = 0.0
     var proceeds = 0.0
-    var monthlyProceeds = 0.0
     val expensesByCategory = mutableMapOf<String, Double>()
 
     for (i in 0 until history.length()) {
         val item = history.optJSONObject(i) ?: continue
         if (item.optString("status") != "CONFIRMADA") continue
+        val timestamp = item.optLong("timestamp", 0L)
+        if (period == ReportPeriod.MONTH && timestamp < monthStart) continue
+
         val amount = item.optDouble("amount", 0.0)
         val investmentType = item.optString("investmentType", "")
-        val timestamp = item.optLong("timestamp", 0L)
         when {
-            investmentType.isNotBlank() -> {
-                proceeds += amount
-                if (timestamp >= monthStart) monthlyProceeds += amount
-            }
+            investmentType.isNotBlank() -> proceeds += amount
             item.optString("type") == "ENTRADA" -> income += amount
             item.optString("type") == "DESPESA" -> {
                 expenses += amount
@@ -76,6 +84,16 @@ fun ReportsScreen(hideValues: Boolean) {
         Text("Relatórios", style = MaterialTheme.typography.headlineMedium)
         Text("Visão geral dos seus lançamentos confirmados.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ReportPeriod.entries.forEach { option ->
+                FilterChip(
+                    selected = period == option,
+                    onClick = { period = option },
+                    label = { Text(option.label) }
+                )
+            }
+        }
+
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ReportCard("Entradas", valueText(income), Modifier.weight(1f))
             ReportCard("Despesas", valueText(expenses), Modifier.weight(1f))
@@ -87,7 +105,7 @@ fun ReportsScreen(hideValues: Boolean) {
 
         IncomeExpenseChart(income = income, expenses = expenses, hideValues = hideValues)
         ExpensesByCategoryChart(expensesByCategory = expensesByCategory, hideValues = hideValues)
-        MonthlyProceedsCard(monthlyProceeds = monthlyProceeds, hideValues = hideValues)
+        ProceedsCard(proceeds = proceeds, hideValues = hideValues, periodLabel = period.label)
     }
 }
 
@@ -101,7 +119,6 @@ private fun IncomeExpenseChart(income: Double, expenses: Double, hideValues: Boo
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("Entradas × Despesas", style = MaterialTheme.typography.titleMedium)
             Text("Comparativo dos lançamentos confirmados.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
             ChartBar("Entradas", incomeRatio, if (hideValues) "R$ ••••" else formatCurrency(income), true)
             ChartBar("Despesas", expenseRatio, if (hideValues) "R$ ••••" else formatCurrency(expenses), false)
         }
@@ -118,7 +135,7 @@ private fun ExpensesByCategoryChart(expensesByCategory: Map<String, Double>, hid
             Text("Despesas por categoria", style = MaterialTheme.typography.titleMedium)
             Text("Veja onde seu dinheiro está sendo mais utilizado.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (sortedCategories.isEmpty()) {
-                Text("Nenhuma despesa confirmada ainda.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Nenhuma despesa confirmada neste período.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 sortedCategories.forEach { (category, value) ->
                     ChartBar(category, (value / maxValue).toFloat().coerceIn(0f, 1f), if (hideValues) "R$ ••••" else formatCurrency(value), false)
@@ -129,12 +146,12 @@ private fun ExpensesByCategoryChart(expensesByCategory: Map<String, Double>, hid
 }
 
 @Composable
-private fun MonthlyProceedsCard(monthlyProceeds: Double, hideValues: Boolean) {
+private fun ProceedsCard(proceeds: Double, hideValues: Boolean, periodLabel: String) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Proventos do mês", style = MaterialTheme.typography.titleMedium)
-            Text("Dividendos, JCP e rendimentos recebidos neste mês.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(if (hideValues) "R$ ••••" else formatCurrency(monthlyProceeds), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+            Text("Proventos", style = MaterialTheme.typography.titleMedium)
+            Text("Dividendos, JCP e rendimentos • $periodLabel", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(if (hideValues) "R$ ••••" else formatCurrency(proceeds), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
