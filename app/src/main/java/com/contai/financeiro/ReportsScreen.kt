@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.json.JSONArray
+import java.util.Calendar
 
 @Composable
 fun ReportsScreen(hideValues: Boolean) {
@@ -29,9 +30,18 @@ fun ReportsScreen(hideValues: Boolean) {
     val prefs = context.getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
     val history = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
 
+    val monthStart = Calendar.getInstance().apply {
+        set(Calendar.DAY_OF_MONTH, 1)
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
     var income = 0.0
     var expenses = 0.0
     var proceeds = 0.0
+    var monthlyProceeds = 0.0
     val expensesByCategory = mutableMapOf<String, Double>()
 
     for (i in 0 until history.length()) {
@@ -39,8 +49,12 @@ fun ReportsScreen(hideValues: Boolean) {
         if (item.optString("status") != "CONFIRMADA") continue
         val amount = item.optDouble("amount", 0.0)
         val investmentType = item.optString("investmentType", "")
+        val timestamp = item.optLong("timestamp", 0L)
         when {
-            investmentType.isNotBlank() -> proceeds += amount
+            investmentType.isNotBlank() -> {
+                proceeds += amount
+                if (timestamp >= monthStart) monthlyProceeds += amount
+            }
             item.optString("type") == "ENTRADA" -> income += amount
             item.optString("type") == "DESPESA" -> {
                 expenses += amount
@@ -73,6 +87,7 @@ fun ReportsScreen(hideValues: Boolean) {
 
         IncomeExpenseChart(income = income, expenses = expenses, hideValues = hideValues)
         ExpensesByCategoryChart(expensesByCategory = expensesByCategory, hideValues = hideValues)
+        MonthlyProceedsCard(monthlyProceeds = monthlyProceeds, hideValues = hideValues)
     }
 }
 
@@ -87,18 +102,8 @@ private fun IncomeExpenseChart(income: Double, expenses: Double, hideValues: Boo
             Text("Entradas × Despesas", style = MaterialTheme.typography.titleMedium)
             Text("Comparativo dos lançamentos confirmados.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            ChartBar(
-                label = "Entradas",
-                ratio = incomeRatio,
-                value = if (hideValues) "R$ ••••" else formatCurrency(income),
-                usePrimary = true
-            )
-            ChartBar(
-                label = "Despesas",
-                ratio = expenseRatio,
-                value = if (hideValues) "R$ ••••" else formatCurrency(expenses),
-                usePrimary = false
-            )
+            ChartBar("Entradas", incomeRatio, if (hideValues) "R$ ••••" else formatCurrency(income), true)
+            ChartBar("Despesas", expenseRatio, if (hideValues) "R$ ••••" else formatCurrency(expenses), false)
         }
     }
 }
@@ -112,19 +117,24 @@ private fun ExpensesByCategoryChart(expensesByCategory: Map<String, Double>, hid
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("Despesas por categoria", style = MaterialTheme.typography.titleMedium)
             Text("Veja onde seu dinheiro está sendo mais utilizado.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
             if (sortedCategories.isEmpty()) {
                 Text("Nenhuma despesa confirmada ainda.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 sortedCategories.forEach { (category, value) ->
-                    ChartBar(
-                        label = category,
-                        ratio = (value / maxValue).toFloat().coerceIn(0f, 1f),
-                        value = if (hideValues) "R$ ••••" else formatCurrency(value),
-                        usePrimary = false
-                    )
+                    ChartBar(category, (value / maxValue).toFloat().coerceIn(0f, 1f), if (hideValues) "R$ ••••" else formatCurrency(value), false)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MonthlyProceedsCard(monthlyProceeds: Double, hideValues: Boolean) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Proventos do mês", style = MaterialTheme.typography.titleMedium)
+            Text("Dividendos, JCP e rendimentos recebidos neste mês.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(if (hideValues) "R$ ••••" else formatCurrency(monthlyProceeds), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -137,19 +147,8 @@ private fun ChartBar(label: String, ratio: Float, value: String, usePrimary: Boo
             Text(label, style = MaterialTheme.typography.labelLarge)
             Text(value, style = MaterialTheme.typography.labelLarge)
         }
-        Box(
-            modifier = Modifier.fillMaxWidth().height(12.dp).background(
-                MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(999.dp)
-            ),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(ratio)
-                    .height(12.dp)
-                    .background(barColor, RoundedCornerShape(999.dp))
-            )
+        Box(modifier = Modifier.fillMaxWidth().height(12.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(999.dp)), contentAlignment = Alignment.CenterStart) {
+            Box(modifier = Modifier.fillMaxWidth(ratio).height(12.dp).background(barColor, RoundedCornerShape(999.dp)))
         }
     }
 }
