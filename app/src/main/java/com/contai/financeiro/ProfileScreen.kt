@@ -268,7 +268,7 @@ fun ProfileScreen(
             }
         }
 
-        SettingsCard("Captura automática", "Permissão, status e diagnóstico")
+        CaptureDiagnosticsCard()
         Card(modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f)) {
