@@ -32,6 +32,7 @@ fun ReportsScreen(hideValues: Boolean) {
     var income = 0.0
     var expenses = 0.0
     var proceeds = 0.0
+    val expensesByCategory = mutableMapOf<String, Double>()
 
     for (i in 0 until history.length()) {
         val item = history.optJSONObject(i) ?: continue
@@ -41,7 +42,11 @@ fun ReportsScreen(hideValues: Boolean) {
         when {
             investmentType.isNotBlank() -> proceeds += amount
             item.optString("type") == "ENTRADA" -> income += amount
-            item.optString("type") == "DESPESA" -> expenses += amount
+            item.optString("type") == "DESPESA" -> {
+                expenses += amount
+                val category = item.optString("category", "Outros").ifBlank { "Outros" }
+                expensesByCategory[category] = (expensesByCategory[category] ?: 0.0) + amount
+            }
         }
     }
 
@@ -67,6 +72,7 @@ fun ReportsScreen(hideValues: Boolean) {
         }
 
         IncomeExpenseChart(income = income, expenses = expenses, hideValues = hideValues)
+        ExpensesByCategoryChart(expensesByCategory = expensesByCategory, hideValues = hideValues)
     }
 }
 
@@ -93,6 +99,32 @@ private fun IncomeExpenseChart(income: Double, expenses: Double, hideValues: Boo
                 value = if (hideValues) "R$ ••••" else formatCurrency(expenses),
                 usePrimary = false
             )
+        }
+    }
+}
+
+@Composable
+private fun ExpensesByCategoryChart(expensesByCategory: Map<String, Double>, hideValues: Boolean) {
+    val sortedCategories = expensesByCategory.entries.sortedByDescending { it.value }
+    val maxValue = maxOf(sortedCategories.maxOfOrNull { it.value } ?: 0.0, 1.0)
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("Despesas por categoria", style = MaterialTheme.typography.titleMedium)
+            Text("Veja onde seu dinheiro está sendo mais utilizado.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            if (sortedCategories.isEmpty()) {
+                Text("Nenhuma despesa confirmada ainda.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                sortedCategories.forEach { (category, value) ->
+                    ChartBar(
+                        label = category,
+                        ratio = (value / maxValue).toFloat().coerceIn(0f, 1f),
+                        value = if (hideValues) "R$ ••••" else formatCurrency(value),
+                        usePrimary = false
+                    )
+                }
+            }
         }
     }
 }
