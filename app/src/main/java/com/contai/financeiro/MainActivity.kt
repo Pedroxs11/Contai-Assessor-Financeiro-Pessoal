@@ -73,6 +73,7 @@ fun ContaiApp() {
     var customExpenseCategories by remember { mutableStateOf(listOf<String>()) }
     var newCategoryName by remember { mutableStateOf("") }
     var selectedSection by remember { mutableStateOf("PENDENCIAS") }
+    var historyFilter by remember { mutableStateOf("TODOS") }
 
     var showManualEntryDialog by remember { mutableStateOf(false) }
     var showValues by remember { mutableStateOf(true) }
@@ -439,9 +440,33 @@ fun ContaiApp() {
                     if (selectedSection == "HISTORICO") Button(onClick = { selectedSection = "HISTORICO" }, modifier = Modifier.weight(1f)) { Text("Histórico") } else OutlinedButton(onClick = { selectedSection = "HISTORICO" }, modifier = Modifier.weight(1f)) { Text("Histórico") }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                val displayedTransactions = if (selectedSection == "PENDENCIAS") transactionHistory.filter { it.status == "POSSIVEL" } else transactionHistory.filter { it.status == "CONFIRMADA" }
+
+                if (selectedSection == "HISTORICO") {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = historyFilter == "TODOS", onClick = { historyFilter = "TODOS" }, label = { Text("Todos") }, modifier = Modifier.weight(1f))
+                        FilterChip(selected = historyFilter == "ENTRADAS", onClick = { historyFilter = "ENTRADAS" }, label = { Text("Entradas") }, modifier = Modifier.weight(1f))
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = historyFilter == "DESPESAS", onClick = { historyFilter = "DESPESAS" }, label = { Text("Despesas") }, modifier = Modifier.weight(1f))
+                        FilterChip(selected = historyFilter == "PROVENTOS", onClick = { historyFilter = "PROVENTOS" }, label = { Text("Proventos") }, modifier = Modifier.weight(1f))
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                val displayedTransactions = if (selectedSection == "PENDENCIAS") {
+                    transactionHistory.filter { it.status == "POSSIVEL" }
+                } else {
+                    val confirmed = transactionHistory.filter { it.status == "CONFIRMADA" }
+                    when (historyFilter) {
+                        "ENTRADAS" -> confirmed.filter { it.type == "ENTRADA" && it.investmentType.isBlank() }
+                        "DESPESAS" -> confirmed.filter { it.type == "DESPESA" }
+                        "PROVENTOS" -> confirmed.filter { it.investmentType.isNotBlank() }
+                        else -> confirmed
+                    }
+                }
+
                 if (displayedTransactions.isEmpty()) {
-                    Text(if (selectedSection == "PENDENCIAS") "Nenhuma transação pendente." else "Nenhuma transação no histórico.")
+                    Text(if (selectedSection == "PENDENCIAS") "Nenhuma transação pendente." else "Nenhuma transação encontrada neste filtro.")
                 } else {
                     displayedTransactions.forEach { transaction ->
                         Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
