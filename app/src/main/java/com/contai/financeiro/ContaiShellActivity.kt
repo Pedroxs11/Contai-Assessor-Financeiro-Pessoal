@@ -1,5 +1,6 @@
 package com.contai.financeiro
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -27,15 +28,29 @@ import androidx.compose.ui.unit.dp
 import com.contai.financeiro.ui.theme.AppThemeMode
 import com.contai.financeiro.ui.theme.ContaiTheme
 
+private const val SETTINGS_PREFS = "contai_settings"
+private const val THEME_MODE_KEY = "theme_mode"
+
 class ContaiShellActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val settings = getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
+        val savedThemeMode = runCatching {
+            AppThemeMode.valueOf(
+                settings.getString(THEME_MODE_KEY, AppThemeMode.SYSTEM.name)
+                    ?: AppThemeMode.SYSTEM.name
+            )
+        }.getOrDefault(AppThemeMode.SYSTEM)
+
         setContent {
-            var themeMode by remember { mutableStateOf(AppThemeMode.SYSTEM) }
+            var themeMode by remember { mutableStateOf(savedThemeMode) }
             ContaiTheme(mode = themeMode) {
                 ContaiShell(
                     themeMode = themeMode,
-                    onThemeModeChange = { themeMode = it }
+                    onThemeModeChange = { newMode ->
+                        themeMode = newMode
+                        settings.edit().putString(THEME_MODE_KEY, newMode.name).apply()
+                    }
                 )
             }
         }
