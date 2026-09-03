@@ -3,9 +3,9 @@ package com.contai.financeiro
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -40,7 +40,7 @@ fun ContaiBottomNavigation(
         NavigationBarItem(
             selected = selected == ContaiDestination.AGENDA,
             onClick = { onDestinationSelected(ContaiDestination.AGENDA) },
-            icon = { Icon(Icons.Filled.CalendarMonth, contentDescription = "Agenda") },
+            icon = { Icon(Icons.Filled.DateRange, contentDescription = "Agenda") },
             label = { Text("Agenda") }
         )
         NavigationBarItem(
@@ -62,7 +62,7 @@ fun ContaiBottomNavigation(
         NavigationBarItem(
             selected = selected == ContaiDestination.REPORTS,
             onClick = { onDestinationSelected(ContaiDestination.REPORTS) },
-            icon = { Icon(Icons.Filled.BarChart, contentDescription = "Relatórios") },
+            icon = { Icon(Icons.Filled.List, contentDescription = "Relatórios") },
             label = { Text("Relatórios") }
         )
         NavigationBarItem(
