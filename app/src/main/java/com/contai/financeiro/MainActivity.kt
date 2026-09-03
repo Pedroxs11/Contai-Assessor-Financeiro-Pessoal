@@ -66,6 +66,7 @@ fun ContaiApp() {
     var debugLastTitle by remember { mutableStateOf("") }
     var transactionHistory by remember { mutableStateOf(listOf<TransactionRecord>()) }
     var transactionToCorrect by remember { mutableStateOf<TransactionRecord?>(null) }
+    var transactionToDelete by remember { mutableStateOf<TransactionRecord?>(null) }
     var customIncomeCategories by remember { mutableStateOf(listOf<String>()) }
     var customExpenseCategories by remember { mutableStateOf(listOf<String>()) }
     var newCategoryName by remember { mutableStateOf("") }
@@ -133,6 +134,19 @@ fun ContaiApp() {
         prefs.edit().putString("transaction_history", historyJson.toString()).apply(); refreshData()
     }
 
+    fun deleteTransaction(timestamp: Long) {
+        val prefs = context.getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
+        val historyJson = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
+        val updated = JSONArray()
+        for (i in 0 until historyJson.length()) {
+            val item = historyJson.getJSONObject(i)
+            if (item.optLong("timestamp", 0L) != timestamp) updated.put(item)
+        }
+        prefs.edit().putString("transaction_history", updated.toString()).apply()
+        transactionToDelete = null
+        refreshData()
+    }
+
     fun saveManualTransaction() {
         val amount = parseBrazilianAmount(manualAmount) ?: return
         val prefs = context.getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
@@ -147,6 +161,21 @@ fun ContaiApp() {
         val historyJson = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
         for (i in 0 until historyJson.length()) if (historyJson.getJSONObject(i).optLong("timestamp", 0L) == timestamp) { historyJson.getJSONObject(i).put("classification", "CONFIRMADA"); break }
         prefs.edit().putString("transaction_history", historyJson.toString()).apply(); refreshData()
+    }
+
+    if (transactionToDelete != null) {
+        val transaction = transactionToDelete!!
+        AlertDialog(
+            onDismissRequest = { transactionToDelete = null },
+            title = { Text("Excluir transação?") },
+            text = { Text("Essa ação removerá definitivamente este lançamento do histórico.") },
+            confirmButton = {
+                Button(onClick = { deleteTransaction(transaction.timestamp) }) { Text("Excluir") }
+            },
+            dismissButton = {
+                TextButton(onClick = { transactionToDelete = null }) { Text("Cancelar") }
+            }
+        )
     }
 
     if (transactionToCorrect != null) {
@@ -204,6 +233,7 @@ fun ContaiApp() {
                 onConfirm = { confirmTransaction(it) },
                 onCorrect = { transactionToCorrect = it },
                 onIgnore = { ignoreTransaction(it) },
+                onDelete = { transactionToDelete = it },
                 showDateGroups = selectedSection == "HISTORICO"
             )
         }
