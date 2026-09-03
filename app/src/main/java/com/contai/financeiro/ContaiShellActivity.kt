@@ -24,21 +24,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import com.contai.financeiro.ui.theme.AppThemeMode
 import com.contai.financeiro.ui.theme.ContaiTheme
 
 class ContaiShellActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            ContaiTheme {
-                ContaiShell()
+            var themeMode by remember { mutableStateOf(AppThemeMode.SYSTEM) }
+            ContaiTheme(mode = themeMode) {
+                ContaiShell(
+                    themeMode = themeMode,
+                    onThemeModeChange = { themeMode = it }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ContaiShell() {
+private fun ContaiShell(
+    themeMode: AppThemeMode,
+    onThemeModeChange: (AppThemeMode) -> Unit
+) {
     val destinations = listOf(
         ContaiDestination.HOME,
         ContaiDestination.AGENDA,
@@ -82,9 +90,7 @@ private fun ContaiShell() {
                 .pointerInput(selectedDestination) {
                     detectHorizontalDragGestures(
                         onDragStart = { horizontalDrag = 0f },
-                        onHorizontalDrag = { _, dragAmount ->
-                            horizontalDrag += dragAmount
-                        },
+                        onHorizontalDrag = { _, dragAmount -> horizontalDrag += dragAmount },
                         onDragEnd = {
                             when {
                                 horizontalDrag <= -120f -> moveDestination(1)
@@ -106,7 +112,10 @@ private fun ContaiShell() {
                     title = "Relatórios",
                     description = "Seus indicadores e análises financeiras ficarão aqui."
                 )
-                ContaiDestination.PROFILE -> ProfileScreen()
+                ContaiDestination.PROFILE -> ProfileScreen(
+                    themeMode = themeMode,
+                    onThemeModeChange = onThemeModeChange
+                )
             }
         }
     }
