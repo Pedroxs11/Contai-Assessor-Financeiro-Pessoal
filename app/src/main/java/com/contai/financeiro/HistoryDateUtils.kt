@@ -52,6 +52,7 @@ fun GroupedHistoryTransactions(
     onConfirm: (Long) -> Unit,
     onCorrect: (TransactionRecord) -> Unit,
     onIgnore: (Long) -> Unit,
+    onDelete: (TransactionRecord) -> Unit,
     showDateGroups: Boolean = true
 ) {
     var previousGroup: String? = null
@@ -61,7 +62,7 @@ fun GroupedHistoryTransactions(
             HistoryDateHeader(group)
             previousGroup = group
         }
-        TransactionHistoryCard(transaction, onConfirm, onCorrect, onIgnore)
+        TransactionHistoryCard(transaction, onConfirm, onCorrect, onIgnore, onDelete)
     }
 }
 
@@ -70,7 +71,8 @@ fun TransactionHistoryCard(
     transaction: TransactionRecord,
     onConfirm: (Long) -> Unit,
     onCorrect: (TransactionRecord) -> Unit,
-    onIgnore: (Long) -> Unit
+    onIgnore: (Long) -> Unit,
+    onDelete: (TransactionRecord) -> Unit
 ) {
     var menuExpanded by remember(transaction.timestamp) { mutableStateOf(false) }
 
@@ -91,7 +93,7 @@ fun TransactionHistoryCard(
                         IconButton(onClick = { menuExpanded = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                             DropdownMenuItem(text = { Text("Editar") }, onClick = { menuExpanded = false; onCorrect(transaction) })
-                            DropdownMenuItem(text = { Text("Excluir") }, onClick = { menuExpanded = false })
+                            DropdownMenuItem(text = { Text("Excluir") }, onClick = { menuExpanded = false; onDelete(transaction) })
                         }
                     }
                 }
