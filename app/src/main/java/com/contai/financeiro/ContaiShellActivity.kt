@@ -106,10 +106,7 @@ private fun ContaiShell() {
                     title = "Relatórios",
                     description = "Seus indicadores e análises financeiras ficarão aqui."
                 )
-                ContaiDestination.PROFILE -> DestinationPlaceholder(
-                    title = "Perfil",
-                    description = "Configurações, categorias e preferências ficarão aqui."
-                )
+                ContaiDestination.PROFILE -> ProfileScreen()
             }
         }
     }
