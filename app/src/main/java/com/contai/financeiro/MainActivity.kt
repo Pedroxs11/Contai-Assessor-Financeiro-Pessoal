@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.json.JSONArray
@@ -70,6 +71,7 @@ fun ContaiApp() {
     var selectedSection by remember { mutableStateOf("PENDENCIAS") }
 
     var showManualEntryDialog by remember { mutableStateOf(false) }
+    var showValues by remember { mutableStateOf(true) }
     var manualType by remember { mutableStateOf("DESPESA") }
     var manualAmount by remember { mutableStateOf("") }
     var manualCategory by remember { mutableStateOf("Outros") }
@@ -621,143 +623,22 @@ fun ContaiApp() {
                     style = MaterialTheme.typography.headlineLarge
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-                Text("Seu assessor financeiro pessoal")
+                Text(
+                    text = "Seu dinheiro, mais claro.",
+                    style = MaterialTheme.typography.bodyLarge
+                )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 Button(
                     onClick = {
                         showManualEntryDialog = true
-                    }
-                ) {
-                    Text("Adicionar manualmente")
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Text(
-                    text = if (notificationAccess) {
-                        "Acesso às notificações: ATIVO"
-                    } else {
-                        "Acesso às notificações: INATIVO"
-                    },
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = when {
-                        !notificationAccess ->
-                            "Serviço de captura: SEM PERMISSÃO"
-
-                        listenerHealthy ->
-                            "Serviço de captura: CONECTADO"
-
-                        else ->
-                            "Serviço de captura: CAPTURA INTERROMPIDA"
-                    },
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                val prefs = context.getSharedPreferences(
-                    "contai_notifications",
-                    Context.MODE_PRIVATE
-                )
-
-                val lifecycleEvent =
-                    prefs.getString("listener_lifecycle_event", "") ?: ""
-
-                val lifecycleAt =
-                    prefs.getLong("listener_lifecycle_at", 0L)
-
-                val lifecycleDateText =
-                    if (lifecycleAt > 0L) {
-                        SimpleDateFormat(
-                            "dd/MM/yyyy HH:mm:ss",
-                            Locale.getDefault()
-                        ).format(Date(lifecycleAt))
-                    } else {
-                        "nenhum"
-                    }
-
-                Text("Diagnóstico do listener")
-                Text("Último app recebido: ${debugLastPackage.ifBlank { "nenhum" }}")
-                Text("Último título recebido: ${debugLastTitle.ifBlank { "nenhum" }}")
-                Text("Último evento de notificação: ${if (debugLastEventAt > 0L) debugLastEventAt.toString() else "nenhum"}")
-                Text("Ciclo de vida: ${lifecycleEvent.ifBlank { "nenhum" }}")
-                Text("Horário do ciclo de vida: $lifecycleDateText")
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = {
-                        val intent = Intent(
-                            Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
-                        )
-                        context.startActivity(intent)
-                    }
-                ) {
-                    Text("Abrir acesso às notificações")
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedButton(
-                    onClick = {
-                        NotificationListenerService.requestRebind(
-                            ComponentName(
-                                context,
-                                FinanceNotificationListener::class.java
-                            )
-                        )
-
-                        scope.launch {
-                            delay(4000)
-                            refreshData()
-
-                            val prefs = context.getSharedPreferences(
-                                "contai_notifications",
-                                Context.MODE_PRIVATE
-                            )
-
-                            val lastAlive =
-                                prefs.getLong("listener_last_alive_at", 0L)
-
-                            val connected =
-                                prefs.getBoolean("service_connected", false)
-
-                            val healthy =
-                                connected &&
-                                lastAlive > 0L &&
-                                System.currentTimeMillis() - lastAlive <= 45_000
-
-                            if (!healthy) {
-                                context.startActivity(
-                                    Intent(
-                                        "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"
-                                    )
-                                )
-                            }
-                        }
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Tentar reconectar captura")
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedButton(
-                    onClick = {
-                        refreshData()
-                    }
-                ) {
-                    Text("Atualizar")
+                    Text("+ Adicionar lançamento")
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -765,41 +646,46 @@ fun ContaiApp() {
                 Card(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        Column {
+                            Text(
+                                text = when {
+                                    !notificationAccess -> "Captura sem permissão"
+                                    listenerHealthy -> "Captura ativa"
+                                    else -> "Captura interrompida"
+                                },
+                                style = MaterialTheme.typography.titleMedium
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = when {
+                                    !notificationAccess ->
+                                        "Ative o acesso às notificações"
+                                    listenerHealthy ->
+                                        "O Contai está acompanhando suas notificações"
+                                    else ->
+                                        "A captura automática precisa de atenção"
+                                },
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+
                         Text(
-                            text = "Última notificação capturada",
+                            text = when {
+                                !notificationAccess -> "⚠️"
+                                listenerHealthy -> "●"
+                                else -> "⚠️"
+                            },
                             style = MaterialTheme.typography.titleLarge
                         )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        if (
-                            lastPackage.isBlank() &&
-                            lastTitle.isBlank() &&
-                            lastText.isBlank()
-                        ) {
-                            Text("Nenhuma notificação capturada ainda.")
-                        } else {
-                            Text("App: ${friendlyAppName(lastPackage)}")
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("Título: $lastTitle")
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("Texto: $lastText")
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text("Valor: ${if (lastAmount.isBlank()) "não identificado" else "R$ " + lastAmount.replace(".", ",")}")
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("Tipo: ${if (lastType.isBlank()) "Não identificado" else lastType}")
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("Confiança: $lastConfidence%")
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("Status: ${when (lastClassification) {
-                                "CONFIRMADA" -> "Confirmada"
-                                "POSSIVEL" -> "Aguardando confirmação"
-                                else -> "Não financeira"
-                            }}")
-                        }
                     }
                 }
 
@@ -819,18 +705,64 @@ fun ContaiApp() {
 
                 val balance = totalIncome - totalExpense
 
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Saldo atual",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+
+                            TextButton(
+                                onClick = { showValues = !showValues }
+                            ) {
+                                Text(if (showValues) "👁" else "🙈")
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = if (showValues) {
+                                "R$ " + String.format(Locale.getDefault(), "%.2f", balance)
+                            } else {
+                                "R$ ••••••"
+                            },
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Card(
                         modifier = Modifier.weight(1f)
                     ) {
                         Column(
-                            modifier = Modifier.padding(12.dp)
+                            modifier = Modifier.padding(16.dp)
                         ) {
                             Text("Entradas")
-                            Text("R$ " + String.format(Locale.getDefault(), "%.2f", totalIncome))
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = if (showValues) {
+                                    "R$ " + String.format(Locale.getDefault(), "%.2f", totalIncome)
+                                } else {
+                                    "R$ ••••••"
+                                },
+                                style = MaterialTheme.typography.titleMedium
+                            )
                         }
                     }
 
@@ -838,21 +770,18 @@ fun ContaiApp() {
                         modifier = Modifier.weight(1f)
                     ) {
                         Column(
-                            modifier = Modifier.padding(12.dp)
+                            modifier = Modifier.padding(16.dp)
                         ) {
                             Text("Despesas")
-                            Text("R$ " + String.format(Locale.getDefault(), "%.2f", totalExpense))
-                        }
-                    }
-
-                    Card(
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp)
-                        ) {
-                            Text("Saldo")
-                            Text("R$ " + String.format(Locale.getDefault(), "%.2f", balance))
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = if (showValues) {
+                                    "R$ " + String.format(Locale.getDefault(), "%.2f", totalExpense)
+                                } else {
+                                    "R$ ••••••"
+                                },
+                                style = MaterialTheme.typography.titleMedium
+                            )
                         }
                     }
                 }
