@@ -43,6 +43,9 @@ fun ProfileScreen(
     val context = LocalContext.current
     val transactionPrefs = context.getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
     var showCategories by remember { mutableStateOf(false) }
+    var showData by remember { mutableStateOf(false) }
+    var confirmClearHistory by remember { mutableStateOf(false) }
+    var historyCleared by remember { mutableStateOf(false) }
     var categoryType by remember { mutableStateOf("DESPESA") }
     var newCategoryName by remember { mutableStateOf("") }
     var categoryToRename by remember { mutableStateOf("") }
@@ -128,6 +131,12 @@ fun ProfileScreen(
         replacementCategory = ""
     }
 
+    fun clearFinancialHistory() {
+        transactionPrefs.edit().putString("transaction_history", "[]").apply()
+        historyCleared = true
+        confirmClearHistory = false
+    }
+
     if (categoryToDelete.isNotBlank()) {
         val isIncome = categoryToDelete in customIncomeCategories
         val replacementOptions = if (isIncome) {
@@ -146,19 +155,12 @@ fun ProfileScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Escolha para qual categoria mover os lançamentos de “$categoryToDelete”. Nenhum lançamento será apagado.")
                     replacementOptions.forEach { category ->
-                        FilterChip(
-                            selected = replacementCategory == category,
-                            onClick = { replacementCategory = category },
-                            label = { Text(category) }
-                        )
+                        FilterChip(selected = replacementCategory == category, onClick = { replacementCategory = category }, label = { Text(category) })
                     }
                 }
             },
             confirmButton = {
-                TextButton(
-                    onClick = { deleteCategory() },
-                    enabled = replacementCategory.isNotBlank()
-                ) { Text("Mover e excluir") }
+                TextButton(onClick = { deleteCategory() }, enabled = replacementCategory.isNotBlank()) { Text("Mover e excluir") }
             },
             dismissButton = {
                 TextButton(onClick = {
@@ -169,11 +171,22 @@ fun ProfileScreen(
         )
     }
 
+    if (confirmClearHistory) {
+        AlertDialog(
+            onDismissRequest = { confirmClearHistory = false },
+            title = { Text("Limpar histórico financeiro?") },
+            text = { Text("Todos os lançamentos financeiros salvos serão removidos e os totais voltarão a zero. Suas categorias e preferências serão mantidas. Esta ação não pode ser desfeita.") },
+            confirmButton = {
+                TextButton(onClick = { clearFinancialHistory() }) { Text("Limpar histórico") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClearHistory = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Perfil e configurações", style = MaterialTheme.typography.headlineMedium)
@@ -214,7 +227,6 @@ fun ProfileScreen(
                     Text("Despesas", style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(6.dp))
                     Text((listOf("Alimentação", "Transporte", "Combustível", "Moradia", "Saúde", "Compras", "Lazer", "Outros") + customExpenseCategories).distinct().joinToString(" • "), style = MaterialTheme.typography.bodyMedium)
-
                     Spacer(Modifier.height(16.dp))
                     Text("Nova categoria", style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(8.dp))
@@ -233,14 +245,10 @@ fun ProfileScreen(
                         Text("Gerenciar categorias personalizadas", style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(8.dp))
                         editableCategories.forEach { category ->
-                            FilterChip(
-                                selected = categoryToRename == category,
-                                onClick = {
-                                    categoryToRename = category
-                                    renamedCategoryName = category
-                                },
-                                label = { Text(category) }
-                            )
+                            FilterChip(selected = categoryToRename == category, onClick = {
+                                categoryToRename = category
+                                renamedCategoryName = category
+                            }, label = { Text(category) })
                         }
                         if (categoryToRename.isNotBlank()) {
                             Spacer(Modifier.height(8.dp))
@@ -248,16 +256,12 @@ fun ProfileScreen(
                             Spacer(Modifier.height(8.dp))
                             Button(onClick = { renameCategory() }, enabled = renamedCategoryName.isNotBlank() && renamedCategoryName.trim() != categoryToRename, modifier = Modifier.fillMaxWidth()) { Text("Renomear") }
                             Spacer(Modifier.height(8.dp))
-                            OutlinedButton(
-                                onClick = {
-                                    categoryToDelete = categoryToRename
-                                    replacementCategory = ""
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) { Text("Excluir categoria") }
+                            OutlinedButton(onClick = {
+                                categoryToDelete = categoryToRename
+                                replacementCategory = ""
+                            }, modifier = Modifier.fillMaxWidth()) { Text("Excluir categoria") }
                         }
                     }
-
                     Spacer(Modifier.height(8.dp))
                     Text("As categorias padrão são protegidas. Ao excluir uma personalizada, os lançamentos são movidos para outra categoria escolhida por você.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -275,7 +279,30 @@ fun ProfileScreen(
                 Switch(checked = hideValues, onCheckedChange = onHideValuesChange)
             }
         }
-        SettingsCard("Dados", "Gerencie os dados financeiros salvos no aparelho")
+
+        Card(modifier = Modifier.fillMaxWidth(), onClick = { showData = !showData }) {
+            Column(Modifier.padding(16.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Dados", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Gerencie os dados financeiros salvos no aparelho", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text(if (showData) "⌃" else "›", style = MaterialTheme.typography.headlineSmall)
+                }
+                if (showData) {
+                    Spacer(Modifier.height(14.dp))
+                    Text("A limpeza remove somente os lançamentos financeiros. Categorias, tema e preferências continuam salvos.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedButton(onClick = { confirmClearHistory = true }, modifier = Modifier.fillMaxWidth()) { Text("Limpar histórico financeiro") }
+                    if (historyCleared) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Histórico financeiro limpo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        }
+
         SettingsCard("Sobre", "Versão e informações do Contai")
     }
 }
