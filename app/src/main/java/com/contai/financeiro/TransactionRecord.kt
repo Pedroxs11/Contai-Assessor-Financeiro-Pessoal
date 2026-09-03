@@ -9,5 +9,6 @@ data class TransactionRecord(
     val source: String,
     val title: String,
     val text: String,
-    val confidence: Int
+    val confidence: Int,
+    val investmentType: String = ""
 )

@@ -176,6 +176,7 @@ class FinanceNotificationListener : NotificationListenerService() {
             .put("category", category)
             .put("confidence", parsed.confidence)
             .put("classification", parsed.classification)
+            .put("investmentType", parsed.investmentType)
 
         if (parsed.amount != null) {
             item.put("amount", parsed.amount)

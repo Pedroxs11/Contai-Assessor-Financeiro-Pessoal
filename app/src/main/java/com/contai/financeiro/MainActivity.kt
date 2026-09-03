@@ -178,7 +178,8 @@ fun ContaiApp() {
                     source = item.optString("package", ""),
                     title = item.optString("title", ""),
                     text = item.optString("text", ""),
-                    confidence = item.optInt("confidence", 0)
+                    confidence = item.optInt("confidence", 0),
+                    investmentType = item.optString("investmentType", "")
                 )
             )
         }
@@ -699,11 +700,29 @@ fun ContaiApp() {
                 }
 
                 val totalIncome = confirmedForTotals
-                    .filter { it.type == "ENTRADA" }
+                    .filter {
+                        it.type == "ENTRADA" &&
+                        it.investmentType.isBlank()
+                    }
                     .sumOf { it.amount ?: 0.0 }
 
                 val totalExpense = confirmedForTotals
                     .filter { it.type == "DESPESA" }
+                    .sumOf { it.amount ?: 0.0 }
+
+                val currentMonth = java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.DAY_OF_MONTH, 1)
+                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }.timeInMillis
+
+                val monthlyProceeds = confirmedForTotals
+                    .filter {
+                        it.investmentType.isNotBlank() &&
+                        it.timestamp >= currentMonth
+                    }
                     .sumOf { it.amount ?: 0.0 }
 
                 val balance = totalIncome - totalExpense
@@ -770,7 +789,8 @@ fun ContaiApp() {
                                 } else {
                                     "R$ ••••••"
                                 },
-                                style = MaterialTheme.typography.titleMedium
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.secondary
                             )
                         }
                     }
@@ -792,9 +812,51 @@ fun ContaiApp() {
                                 } else {
                                     "R$ ••••••"
                                 },
-                                style = MaterialTheme.typography.titleMedium
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.tertiary
                             )
                         }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Proventos do mês",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = if (showValues) {
+                                    "R$ " + String.format(
+                                        Locale.getDefault(),
+                                        "%.2f",
+                                        monthlyProceeds
+                                    )
+                                } else {
+                                    "R$ ••••••"
+                                },
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        Text(
+                            text = "Investimentos",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
 
@@ -893,7 +955,12 @@ fun ContaiApp() {
 
                                     Text(
                                         text = amountText,
-                                        style = MaterialTheme.typography.titleMedium
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = when (transaction.type) {
+                                            "ENTRADA" -> MaterialTheme.colorScheme.secondary
+                                            "DESPESA" -> MaterialTheme.colorScheme.tertiary
+                                            else -> MaterialTheme.colorScheme.onSurface
+                                        }
                                     )
                                 }
 
@@ -908,14 +975,16 @@ fun ContaiApp() {
 
                                 Text(
                                     text = "${transaction.type} • $statusText",
-                                    style = MaterialTheme.typography.bodyMedium
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
 
                                 Spacer(modifier = Modifier.height(6.dp))
 
                                 Text(
                                     text = dateText,
-                                    style = MaterialTheme.typography.bodySmall
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
 
                                 if (transaction.status == "POSSIVEL") {
@@ -946,7 +1015,7 @@ fun ContaiApp() {
 
                                     Spacer(modifier = Modifier.height(8.dp))
 
-                                    OutlinedButton(
+                                    TextButton(
                                         onClick = {
                                             ignoreTransaction(transaction.timestamp)
                                         },

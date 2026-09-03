@@ -5,7 +5,8 @@ data class ParsedTransaction(
     val type: String,
     val description: String,
     val confidence: Int,
-    val classification: String
+    val classification: String,
+    val investmentType: String = ""
 )
 
 object FinancialParser {
@@ -73,6 +74,15 @@ object FinancialParser {
         )
 
 
+        val investmentType = when {
+            lower.contains("dividendo") || lower.contains("dividendos") -> "DIVIDENDO"
+            lower.contains("jcp") ||
+                lower.contains("juros sobre capital próprio") ||
+                lower.contains("juros sobre capital proprio") -> "JCP"
+            lower.contains("rendimento") || lower.contains("rendimentos") -> "RENDIMENTO"
+            else -> ""
+        }
+
         val promoWords = listOf(
             "promoção",
             "promocao",
@@ -99,6 +109,7 @@ object FinancialParser {
             promoWords.any { lower.contains(it) }
 
         val type = when {
+            investmentType.isNotBlank() -> "ENTRADA"
             incomeWords.any { lower.contains(it) } -> "ENTRADA"
             expenseWords.any { lower.contains(it) } -> "DESPESA"
             else -> "NAO_IDENTIFICADO"
@@ -125,7 +136,8 @@ object FinancialParser {
             type = type,
             description = content,
             confidence = confidence,
-            classification = classification
+            classification = classification,
+            investmentType = investmentType
         )
     }
 }
