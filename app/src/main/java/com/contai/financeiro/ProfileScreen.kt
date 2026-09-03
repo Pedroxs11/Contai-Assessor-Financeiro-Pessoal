@@ -14,10 +14,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -26,10 +22,10 @@ import com.contai.financeiro.ui.theme.AppThemeMode
 @Composable
 fun ProfileScreen(
     themeMode: AppThemeMode,
-    onThemeModeChange: (AppThemeMode) -> Unit
+    onThemeModeChange: (AppThemeMode) -> Unit,
+    hideValues: Boolean,
+    onHideValuesChange: (Boolean) -> Unit
 ) {
-    var hideValues by remember { mutableStateOf(false) }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -102,7 +98,7 @@ fun ProfileScreen(
                 }
                 Switch(
                     checked = hideValues,
-                    onCheckedChange = { hideValues = it }
+                    onCheckedChange = onHideValuesChange
                 )
             }
         }
