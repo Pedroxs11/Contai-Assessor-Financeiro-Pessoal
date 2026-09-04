@@ -1,7 +1,10 @@
 package com.contai.financeiro
 
+import android.content.ComponentName
 import android.content.Context
 import android.os.Bundle
+import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -62,6 +65,30 @@ class ContaiShellActivity : ComponentActivity() {
                     }
                 )
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        val listenerComponent = ComponentName(
+            this,
+            FinanceNotificationListener::class.java
+        )
+
+        val enabledListeners = Settings.Secure.getString(
+            contentResolver,
+            "enabled_notification_listeners"
+        ).orEmpty()
+
+        if (enabledListeners.contains(listenerComponent.flattenToString())) {
+            getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
+                .edit()
+                .putString("listener_lifecycle_event", "rebindRequestedOnAppResume")
+                .putLong("listener_lifecycle_at", System.currentTimeMillis())
+                .apply()
+
+            NotificationListenerService.requestRebind(listenerComponent)
         }
     }
 }
