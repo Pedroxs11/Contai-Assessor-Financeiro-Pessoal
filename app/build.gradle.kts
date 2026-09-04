@@ -3,6 +3,17 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val signingStoreFile = System.getenv("CONTAI_STORE_FILE")
+val signingStorePassword = System.getenv("CONTAI_STORE_PASSWORD")
+val signingKeyAlias = System.getenv("CONTAI_KEY_ALIAS")
+val signingKeyPassword = System.getenv("CONTAI_KEY_PASSWORD")
+val hasReleaseSigning = listOf(
+    signingStoreFile,
+    signingStorePassword,
+    signingKeyAlias,
+    signingKeyPassword
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.contai.financeiro"
     compileSdk = 35
@@ -13,6 +24,26 @@ android {
         targetSdk = 35
         versionCode = 2
         versionName = "1.1-beta"
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(signingStoreFile!!)
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
     }
 
     compileOptions {
