@@ -32,6 +32,10 @@ fun QuickManualEntryDialog(
     onSaved: () -> Unit
 ) {
     val context = LocalContext.current
+    val prefs = remember {
+        context.getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
+    }
+
     var type by remember { mutableStateOf("DESPESA") }
     var amountText by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Outros") }
@@ -45,10 +49,25 @@ fun QuickManualEntryDialog(
         .replace(",", ".")
     val amount = normalizedAmount.toDoubleOrNull()
 
+    val customIncomeCategories = remember {
+        prefs.getStringSet("custom_income_categories", emptySet())
+            ?.toList()
+            ?.sorted()
+            .orEmpty()
+    }
+    val customExpenseCategories = remember {
+        prefs.getStringSet("custom_expense_categories", emptySet())
+            ?.toList()
+            ?.sorted()
+            .orEmpty()
+    }
+
     val categories = if (type == "ENTRADA") {
-        listOf("Receitas", "Salário", "Pix recebido", "Outros")
+        (listOf("Receitas", "Salário", "Pix recebido", "Outros") + customIncomeCategories)
+            .distinct()
     } else {
-        listOf("Alimentação", "Transporte", "Combustível", "Moradia", "Saúde", "Compras", "Lazer", "Outros")
+        (listOf("Alimentação", "Transporte", "Combustível", "Moradia", "Saúde", "Compras", "Lazer", "Outros") + customExpenseCategories)
+            .distinct()
     }
 
     AlertDialog(
@@ -113,7 +132,6 @@ fun QuickManualEntryDialog(
                 enabled = amount != null && amount > 0.0,
                 onClick = {
                     val validAmount = amount ?: return@Button
-                    val prefs = context.getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
                     val history = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
                     history.put(
                         JSONObject()
