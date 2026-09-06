@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -151,12 +153,15 @@ fun ProfileScreen(
         )
     }
 
+    val premiumCardShape = RoundedCornerShape(20.dp)
+    val premiumCardColors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Perfil e configurações", style = MaterialTheme.typography.headlineMedium)
         Text("Personalize o Contai do seu jeito.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))
 
-        Card(modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) {
+        Card(modifier = Modifier.fillMaxWidth(), shape = premiumCardShape, colors = premiumCardColors) { Column(Modifier.padding(18.dp)) {
             Text("Aparência", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(4.dp))
             Text("Escolha como o Contai deve aparecer.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -168,10 +173,10 @@ fun ProfileScreen(
             }
         } }
 
-        Card(modifier = Modifier.fillMaxWidth(), onClick = { showCategories = !showCategories }) { Column(Modifier.padding(16.dp)) {
+        Card(modifier = Modifier.fillMaxWidth(), shape = premiumCardShape, colors = premiumCardColors, onClick = { showCategories = !showCategories }) { Column(Modifier.padding(18.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f)) { Text("Categorias", style = MaterialTheme.typography.titleMedium); Spacer(Modifier.height(4.dp)); Text("Gerencie suas categorias de entradas e despesas", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                Text(if (showCategories) "⌃" else "›", style = MaterialTheme.typography.headlineSmall)
+                Text(if (showCategories) "⌃" else "›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
             }
             if (showCategories) {
                 Spacer(Modifier.height(16.dp)); Text("Entradas", style = MaterialTheme.typography.titleSmall); Spacer(Modifier.height(6.dp)); Text((listOf("Receitas", "Salário", "Pix recebido", "Outros") + customIncomeCategories).distinct().joinToString(" • "), style = MaterialTheme.typography.bodyMedium)
@@ -193,24 +198,24 @@ fun ProfileScreen(
 
         CaptureDiagnosticsCard()
 
-        Card(modifier = Modifier.fillMaxWidth()) { Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        Card(modifier = Modifier.fillMaxWidth(), shape = premiumCardShape, colors = premiumCardColors) { Row(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Column(modifier = Modifier.weight(1f)) { Text("Ocultar valores", style = MaterialTheme.typography.titleMedium); Spacer(Modifier.height(4.dp)); Text("Esconde valores financeiros ao abrir o aplicativo.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Switch(checked = hideValues, onCheckedChange = onHideValuesChange)
         } }
 
-        Card(modifier = Modifier.fillMaxWidth(), onClick = { showData = !showData }) { Column(Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column(modifier = Modifier.weight(1f)) { Text("Dados", style = MaterialTheme.typography.titleMedium); Spacer(Modifier.height(4.dp)); Text("Gerencie os dados financeiros salvos no aparelho", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }; Text(if (showData) "⌃" else "›", style = MaterialTheme.typography.headlineSmall) }
+        Card(modifier = Modifier.fillMaxWidth(), shape = premiumCardShape, colors = premiumCardColors, onClick = { showData = !showData }) { Column(Modifier.padding(18.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Column(modifier = Modifier.weight(1f)) { Text("Dados", style = MaterialTheme.typography.titleMedium); Spacer(Modifier.height(4.dp)); Text("Gerencie os dados financeiros salvos no aparelho", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }; Text(if (showData) "⌃" else "›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary) }
             if (showData) { Spacer(Modifier.height(14.dp)); Text("A limpeza remove somente os lançamentos financeiros. Categorias, tema e preferências continuam salvos.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(10.dp)); OutlinedButton(onClick = { confirmClearHistory = true }, modifier = Modifier.fillMaxWidth()) { Text("Limpar histórico financeiro") }; if (historyCleared) { Spacer(Modifier.height(8.dp)); Text("Histórico financeiro limpo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) } }
         } }
 
-        Card(modifier = Modifier.fillMaxWidth(), onClick = { showAbout = !showAbout }) { Column(Modifier.padding(16.dp)) {
+        Card(modifier = Modifier.fillMaxWidth(), shape = premiumCardShape, colors = premiumCardColors, onClick = { showAbout = !showAbout }) { Column(Modifier.padding(18.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f)) { Text("Sobre", style = MaterialTheme.typography.titleMedium); Spacer(Modifier.height(4.dp)); Text("Versão e informações do Contai", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                Text(if (showAbout) "⌃" else "›", style = MaterialTheme.typography.headlineSmall)
+                Text(if (showAbout) "⌃" else "›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
             }
             if (showAbout) {
                 Spacer(Modifier.height(14.dp))
-                Text("Contai • V1 Beta", style = MaterialTheme.typography.titleSmall)
+                Text("Contai • V1 Beta", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(6.dp))
                 Text("Assessor financeiro pessoal com organização local dos seus lançamentos.", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(8.dp))
