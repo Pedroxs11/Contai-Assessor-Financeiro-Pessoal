@@ -15,10 +15,34 @@ class FinanceNotificationListener : NotificationListenerService() {
 
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
-            prefs().edit()
-                .putBoolean("service_connected", true)
-                .putLong("listener_last_alive_at", System.currentTimeMillis())
-                .apply()
+            val now = System.currentTimeMillis()
+            val binderResponding = runCatching {
+                activeNotifications != null
+            }.getOrDefault(false)
+
+            val editor = prefs().edit()
+                .putBoolean("service_connected", binderResponding)
+                .putLong("listener_probe_at", now)
+                .putString(
+                    "listener_probe_status",
+                    if (binderResponding) "BOUND" else "UNBOUND"
+                )
+
+            if (binderResponding) {
+                editor.putLong("listener_last_alive_at", now)
+            }
+
+            editor.apply()
+
+            if (!binderResponding) {
+                saveLifecycleEvent("heartbeatDetectedUnbound")
+                NotificationListenerService.requestRebind(
+                    ComponentName(
+                        this@FinanceNotificationListener,
+                        FinanceNotificationListener::class.java
+                    )
+                )
+            }
 
             heartbeatHandler.postDelayed(this, 15_000)
         }
@@ -213,28 +237,29 @@ class FinanceNotificationListener : NotificationListenerService() {
         ).firstOrNull { it.isNotBlank() }.orEmpty()
 
         prefs().edit()
+            .putBoolean("service_connected", true)
             .putLong("listener_last_alive_at", System.currentTimeMillis())
             .putLong("debug_last_event_at", System.currentTimeMillis())
-            .putString("debug_last_package", sbn?.packageName.orEmpty())
+            .putString("debug_last_package", sbn.packageName.orEmpty())
             .putString("debug_last_title", title)
             .putString("debug_last_text", text)
             .apply()
 
-        val parsed = FinancialParser.parse(sbn?.packageName.orEmpty(), title, text)
+        val parsed = FinancialParser.parse(sbn.packageName.orEmpty(), title, text)
 
         if (parsed.classification == "NAO_FINANCEIRA") {
             return
         }
 
         saveToHistory(
-            sbn?.packageName.orEmpty(),
+            sbn.packageName.orEmpty(),
             title,
             text,
             parsed
         )
 
         val editor = prefs().edit()
-            .putString("last_package", sbn?.packageName.orEmpty())
+            .putString("last_package", sbn.packageName.orEmpty())
             .putString("last_title", title)
             .putString("last_text", text)
             .putString("last_type", parsed.type)
