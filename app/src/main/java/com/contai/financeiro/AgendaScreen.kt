@@ -48,6 +48,7 @@ import java.util.Locale
 private const val AGENDA_PREFS = "contai_agenda"
 private const val AGENDA_ITEMS_KEY = "agenda_items"
 private const val RECURRENCE_NONE = "NONE"
+private const val RECURRENCE_WEEKLY = "WEEKLY"
 private const val RECURRENCE_MONTHLY = "MONTHLY"
 
 private data class AgendaItem(
@@ -112,6 +113,14 @@ private fun formatAgendaDate(timestamp: Long): String =
 
 private fun formatAgendaTime(timestamp: Long): String =
     SimpleDateFormat("HH:mm", Locale("pt", "BR")).format(Date(timestamp))
+
+private fun nextWeeklyOccurrence(timestamp: Long, after: Long = System.currentTimeMillis()): Long {
+    val calendar = Calendar.getInstance().apply { timeInMillis = timestamp }
+    do {
+        calendar.add(Calendar.WEEK_OF_YEAR, 1)
+    } while (calendar.timeInMillis <= after)
+    return calendar.timeInMillis
+}
 
 private fun nextMonthlyOccurrence(timestamp: Long, after: Long = System.currentTimeMillis()): Long {
     val calendar = Calendar.getInstance().apply { timeInMillis = timestamp }
@@ -294,18 +303,29 @@ fun AgendaScreen() {
                     Text("Repetição", style = MaterialTheme.typography.labelLarge)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         if (recurrence == RECURRENCE_NONE) {
                             Button(
                                 onClick = { recurrence = RECURRENCE_NONE },
                                 modifier = Modifier.weight(1f)
-                            ) { Text("Não repetir") }
+                            ) { Text("Não") }
                         } else {
                             OutlinedButton(
                                 onClick = { recurrence = RECURRENCE_NONE },
                                 modifier = Modifier.weight(1f)
-                            ) { Text("Não repetir") }
+                            ) { Text("Não") }
+                        }
+                        if (recurrence == RECURRENCE_WEEKLY) {
+                            Button(
+                                onClick = { recurrence = RECURRENCE_WEEKLY },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Semanal") }
+                        } else {
+                            OutlinedButton(
+                                onClick = { recurrence = RECURRENCE_WEEKLY },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Semanal") }
                         }
                         if (recurrence == RECURRENCE_MONTHLY) {
                             Button(
@@ -414,7 +434,7 @@ fun AgendaScreen() {
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    "Crie lembretes únicos ou mensais para contas, vencimentos e compromissos.",
+                    "Crie lembretes únicos, semanais ou mensais para contas, vencimentos e compromissos.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -488,8 +508,13 @@ fun AgendaScreen() {
                                 MaterialTheme.colorScheme.primary
                             }
                         )
-                        if (item.recurrence == RECURRENCE_MONTHLY) {
-                            Text(
+                        when (item.recurrence) {
+                            RECURRENCE_WEEKLY -> Text(
+                                "Repete toda semana",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            RECURRENCE_MONTHLY -> Text(
                                 "Repete todo mês",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -527,10 +552,16 @@ fun AgendaScreen() {
                                     if (it.id == item.id) completed else it
                                 }.toMutableList()
 
-                                if (item.recurrence == RECURRENCE_MONTHLY) {
+                                val nextDueAt = when (item.recurrence) {
+                                    RECURRENCE_WEEKLY -> nextWeeklyOccurrence(item.dueAt)
+                                    RECURRENCE_MONTHLY -> nextMonthlyOccurrence(item.dueAt)
+                                    else -> null
+                                }
+
+                                nextDueAt?.let { dueAt ->
                                     val nextItem = item.copy(
                                         id = System.currentTimeMillis(),
-                                        dueAt = nextMonthlyOccurrence(item.dueAt),
+                                        dueAt = dueAt,
                                         completed = false
                                     )
                                     updatedItems.add(nextItem)
@@ -544,10 +575,10 @@ fun AgendaScreen() {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                if (item.recurrence == RECURRENCE_MONTHLY) {
-                                    "Concluir e criar próximo mês"
-                                } else {
-                                    "Marcar como concluído"
+                                when (item.recurrence) {
+                                    RECURRENCE_WEEKLY -> "Concluir e criar próxima semana"
+                                    RECURRENCE_MONTHLY -> "Concluir e criar próximo mês"
+                                    else -> "Marcar como concluído"
                                 }
                             )
                         }
@@ -575,8 +606,13 @@ fun AgendaScreen() {
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        if (item.recurrence == RECURRENCE_MONTHLY) {
-                            Text(
+                        when (item.recurrence) {
+                            RECURRENCE_WEEKLY -> Text(
+                                "Recorrência semanal mantida no próximo lembrete",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            RECURRENCE_MONTHLY -> Text(
                                 "Recorrência mensal mantida no próximo lembrete",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary
@@ -589,7 +625,7 @@ fun AgendaScreen() {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            if (item.recurrence != RECURRENCE_MONTHLY) {
+                            if (item.recurrence == RECURRENCE_NONE) {
                                 OutlinedButton(
                                     onClick = {
                                         val reopened = item.copy(completed = false)
@@ -627,7 +663,7 @@ fun AgendaScreen() {
             ) {
                 Text("Teste operacional", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Teste um lembrete mensal: ao concluir, o Contai deve criar e agendar automaticamente a próxima ocorrência.",
+                    "Teste um lembrete semanal ou mensal: ao concluir, o Contai deve criar e agendar automaticamente a próxima ocorrência.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
