@@ -27,9 +27,9 @@ private val ContaiLightColors = lightColorScheme(
 )
 
 private val ContaiDarkColors = darkColorScheme(
-    primary = ContaiGreen,
-    onPrimary = ContaiDarkTextPrimary,
-    primaryContainer = ContaiDarkGreenContainer,
+    primary = ContaiYellow,
+    onPrimary = ContaiOnYellow,
+    primaryContainer = ContaiDarkYellowContainer,
     onPrimaryContainer = ContaiDarkTextPrimary,
     background = ContaiDarkBackground,
     onBackground = ContaiDarkTextPrimary,
@@ -38,8 +38,10 @@ private val ContaiDarkColors = darkColorScheme(
     surfaceVariant = ContaiDarkSurfaceVariant,
     onSurfaceVariant = ContaiDarkTextSecondary,
     secondary = ContaiIncome,
+    onSecondary = ContaiOnYellow,
     tertiary = ContaiExpense,
-    error = ContaiExpense
+    error = ContaiExpense,
+    outline = ContaiDarkOutline
 )
 
 @Composable
