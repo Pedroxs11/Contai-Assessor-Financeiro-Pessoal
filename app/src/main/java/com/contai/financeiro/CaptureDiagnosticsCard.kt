@@ -36,6 +36,9 @@ fun CaptureDiagnosticsCard() {
     val lastAliveAt = prefs.getLong("listener_last_alive_at", 0L)
     val lastEvent = prefs.getString("listener_lifecycle_event", "Sem registro") ?: "Sem registro"
     val lastEventAt = prefs.getLong("listener_lifecycle_at", 0L)
+    val lastNotificationAt = prefs.getLong("debug_last_event_at", 0L)
+    val lastNotificationPackage = prefs.getString("debug_last_package", "").orEmpty()
+    val lastNotificationTitle = prefs.getString("debug_last_title", "").orEmpty()
     val aliveRecently = connected && lastAliveAt > 0L && System.currentTimeMillis() - lastAliveAt <= 45_000L
     var recoveryFeedback by remember { mutableStateOf<String?>(null) }
 
@@ -72,12 +75,35 @@ fun CaptureDiagnosticsCard() {
             }
 
             Text(
-                "Último sinal: ${formattedTime(lastAliveAt)}",
+                "Último sinal do serviço: ${formattedTime(lastAliveAt)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                "Último evento: $lastEvent • ${formattedTime(lastEventAt)}",
+                "Última notificação recebida: ${formattedTime(lastNotificationAt)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (lastNotificationAt > 0L) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+            if (lastNotificationAt > 0L) {
+                val origin = when {
+                    lastNotificationTitle.isNotBlank() && lastNotificationPackage.isNotBlank() ->
+                        "$lastNotificationTitle • $lastNotificationPackage"
+                    lastNotificationTitle.isNotBlank() -> lastNotificationTitle
+                    lastNotificationPackage.isNotBlank() -> lastNotificationPackage
+                    else -> "Origem não identificada"
+                }
+                Text(
+                    "Origem da última notificação: $origin",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                "Último evento do serviço: $lastEvent • ${formattedTime(lastEventAt)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
