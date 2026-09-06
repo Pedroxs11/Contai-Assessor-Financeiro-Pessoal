@@ -2,7 +2,9 @@ package com.contai.financeiro
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.DatePickerDialog
 import android.app.PendingIntent
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -175,7 +178,7 @@ fun AgendaScreen() {
     var title by remember { mutableStateOf("") }
     var amountText by remember { mutableStateOf("") }
     var dateText by remember { mutableStateOf("") }
-    var timeText by remember { mutableStateOf("09:00") }
+    var timeText by remember { mutableStateOf("") }
     var recurrence by remember { mutableStateOf(RECURRENCE_NONE) }
 
     fun clearEditor() {
@@ -183,17 +186,18 @@ fun AgendaScreen() {
         title = ""
         amountText = ""
         dateText = ""
-        timeText = "09:00"
+        timeText = ""
         recurrence = RECURRENCE_NONE
         showEditorDialog = false
     }
 
     fun openNewReminder() {
+        val suggestedAt = System.currentTimeMillis() + 60 * 60 * 1000L
         editingItem = null
         title = ""
         amountText = ""
-        dateText = ""
-        timeText = "09:00"
+        dateText = formatAgendaDate(suggestedAt)
+        timeText = formatAgendaTime(suggestedAt)
         recurrence = RECURRENCE_NONE
         showEditorDialog = true
     }
@@ -206,6 +210,47 @@ fun AgendaScreen() {
         timeText = formatAgendaTime(item.dueAt)
         recurrence = item.recurrence
         showEditorDialog = true
+    }
+
+    fun openDatePicker() {
+        val baseTimestamp = parseAgendaDateTime(dateText, timeText)
+            ?: (System.currentTimeMillis() + 60 * 60 * 1000L)
+        val calendar = Calendar.getInstance().apply { timeInMillis = baseTimestamp }
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                dateText = String.format(
+                    Locale("pt", "BR"),
+                    "%02d/%02d/%04d",
+                    dayOfMonth,
+                    month + 1,
+                    year
+                )
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    fun openTimePicker() {
+        val baseTimestamp = parseAgendaDateTime(dateText, timeText)
+            ?: (System.currentTimeMillis() + 60 * 60 * 1000L)
+        val calendar = Calendar.getInstance().apply { timeInMillis = baseTimestamp }
+        TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                timeText = String.format(
+                    Locale("pt", "BR"),
+                    "%02d:%02d",
+                    hourOfDay,
+                    minute
+                )
+            },
+            calendar.get(Calendar.HOUR_OF_DAY),
+            calendar.get(Calendar.MINUTE),
+            true
+        ).show()
     }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -261,11 +306,17 @@ fun AgendaScreen() {
             onDismissRequest = { clearEditor() },
             title = { Text(if (currentEditingItem == null) "Novo lembrete" else "Editar lembrete") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 470.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
                         label = { Text("Título") },
+                        placeholder = { Text("Ex.: Pagar cartão") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -284,68 +335,60 @@ fun AgendaScreen() {
                             color = MaterialTheme.colorScheme.error
                         )
                     }
-                    OutlinedTextField(
-                        value = dateText,
-                        onValueChange = { dateText = it },
-                        label = { Text("Data") },
-                        placeholder = { Text("dd/mm/aaaa") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = timeText,
-                        onValueChange = { timeText = it },
-                        label = { Text("Horário") },
-                        placeholder = { Text("hh:mm") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+
+                    Text("Quando", style = MaterialTheme.typography.labelLarge)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { openDatePicker() },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(dateText.ifBlank { "Data" })
+                        }
+                        OutlinedButton(
+                            onClick = { openTimePicker() },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(timeText.ifBlank { "Horário" })
+                        }
+                    }
+
                     Text("Repetição", style = MaterialTheme.typography.labelLarge)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        if (recurrence == RECURRENCE_NONE) {
-                            Button(
-                                onClick = { recurrence = RECURRENCE_NONE },
-                                modifier = Modifier.weight(1f)
-                            ) { Text("Não") }
-                        } else {
-                            OutlinedButton(
-                                onClick = { recurrence = RECURRENCE_NONE },
-                                modifier = Modifier.weight(1f)
-                            ) { Text("Não") }
-                        }
-                        if (recurrence == RECURRENCE_WEEKLY) {
-                            Button(
-                                onClick = { recurrence = RECURRENCE_WEEKLY },
-                                modifier = Modifier.weight(1f)
-                            ) { Text("Semanal") }
-                        } else {
-                            OutlinedButton(
-                                onClick = { recurrence = RECURRENCE_WEEKLY },
-                                modifier = Modifier.weight(1f)
-                            ) { Text("Semanal") }
-                        }
-                        if (recurrence == RECURRENCE_MONTHLY) {
-                            Button(
-                                onClick = { recurrence = RECURRENCE_MONTHLY },
-                                modifier = Modifier.weight(1f)
-                            ) { Text("Mensal") }
-                        } else {
-                            OutlinedButton(
-                                onClick = { recurrence = RECURRENCE_MONTHLY },
-                                modifier = Modifier.weight(1f)
-                            ) { Text("Mensal") }
-                        }
-                    }
-                    if ((dateText.isNotBlank() || timeText.isNotBlank()) && parsedDateTime == null) {
-                        Text(
-                            "Use data e horário válidos, por exemplo 10/09/2026 às 09:00.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
+                        RecurrenceButton(
+                            label = "Único",
+                            selected = recurrence == RECURRENCE_NONE,
+                            onClick = { recurrence = RECURRENCE_NONE },
+                            modifier = Modifier.weight(1f)
+                        )
+                        RecurrenceButton(
+                            label = "Semanal",
+                            selected = recurrence == RECURRENCE_WEEKLY,
+                            onClick = { recurrence = RECURRENCE_WEEKLY },
+                            modifier = Modifier.weight(1f)
+                        )
+                        RecurrenceButton(
+                            label = "Mensal",
+                            selected = recurrence == RECURRENCE_MONTHLY,
+                            onClick = { recurrence = RECURRENCE_MONTHLY },
+                            modifier = Modifier.weight(1f)
                         )
                     }
+                    Text(
+                        when (recurrence) {
+                            RECURRENCE_WEEKLY -> "Ao concluir, o próximo lembrete será criado para a semana seguinte."
+                            RECURRENCE_MONTHLY -> "Ao concluir, o próximo lembrete será criado para o mês seguinte."
+                            else -> "Este lembrete acontecerá apenas uma vez."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
                     if (parsedDateTime != null && parsedDateTime <= System.currentTimeMillis()) {
                         Text(
                             "O lembrete precisa estar no futuro.",
@@ -486,9 +529,7 @@ fun AgendaScreen() {
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     border = if (isOverdue) {
                         BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.65f))
-                    } else {
-                        null
-                    }
+                    } else null
                 ) {
                     Column(
                         modifier = Modifier.padding(18.dp),
@@ -496,17 +537,11 @@ fun AgendaScreen() {
                     ) {
                         Text(item.title, style = MaterialTheme.typography.titleMedium)
                         Text(
-                            if (isOverdue) {
-                                "Atrasado • ${formatAgendaDateTime(item.dueAt)}"
-                            } else {
-                                formatAgendaDateTime(item.dueAt)
-                            },
+                            if (isOverdue) "Atrasado • ${formatAgendaDateTime(item.dueAt)}"
+                            else formatAgendaDateTime(item.dueAt),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (isOverdue) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            }
+                            color = if (isOverdue) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.primary
                         )
                         when (item.recurrence) {
                             RECURRENCE_WEEKLY -> Text(
@@ -534,15 +569,11 @@ fun AgendaScreen() {
                             OutlinedButton(
                                 onClick = { openEditReminder(item) },
                                 modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Editar")
-                            }
+                            ) { Text("Editar") }
                             OutlinedButton(
                                 onClick = { deletingItem = item },
                                 modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Excluir", color = MaterialTheme.colorScheme.error)
-                            }
+                            ) { Text("Excluir", color = MaterialTheme.colorScheme.error) }
                         }
                         Button(
                             onClick = {
@@ -636,16 +667,12 @@ fun AgendaScreen() {
                                     },
                                     enabled = item.dueAt > System.currentTimeMillis(),
                                     modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Reabrir")
-                                }
+                                ) { Text("Reabrir") }
                             }
                             OutlinedButton(
                                 onClick = { deletingItem = item },
                                 modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Excluir", color = MaterialTheme.colorScheme.error)
-                            }
+                            ) { Text("Excluir", color = MaterialTheme.colorScheme.error) }
                         }
                     }
                 }
@@ -663,12 +690,26 @@ fun AgendaScreen() {
             ) {
                 Text("Teste operacional", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Teste um lembrete semanal ou mensal: ao concluir, o Contai deve criar e agendar automaticamente a próxima ocorrência.",
+                    "Crie um lembrete para alguns minutos à frente, feche o app e confirme se a notificação aparece no horário definido.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun RecurrenceButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (selected) {
+        Button(onClick = onClick, modifier = modifier) { Text(label) }
+    } else {
+        OutlinedButton(onClick = onClick, modifier = modifier) { Text(label) }
     }
 }
 
@@ -685,9 +726,7 @@ private fun AgendaInfoCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         border = if (emphasized) {
             BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.65f))
-        } else {
-            null
-        }
+        } else null
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -696,16 +735,14 @@ private fun AgendaInfoCard(
             Text(
                 title,
                 style = MaterialTheme.typography.labelLarge,
-                color = if (emphasized) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
+                color = if (emphasized) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 value,
                 style = MaterialTheme.typography.titleMedium,
-                color = if (emphasized) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                color = if (emphasized) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurface
             )
         }
     }
