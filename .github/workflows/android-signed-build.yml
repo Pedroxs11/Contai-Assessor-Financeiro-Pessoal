@@ -2,11 +2,6 @@ name: Android Signed Build
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - dev/v1-1-beta
-    paths:
-      - '.github/workflows/android-signed-build.yml'
 
 jobs:
   build-signed:
