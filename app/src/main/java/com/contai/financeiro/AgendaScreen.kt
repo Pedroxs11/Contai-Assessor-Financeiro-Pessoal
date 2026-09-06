@@ -47,13 +47,16 @@ import java.util.Locale
 
 private const val AGENDA_PREFS = "contai_agenda"
 private const val AGENDA_ITEMS_KEY = "agenda_items"
+private const val RECURRENCE_NONE = "NONE"
+private const val RECURRENCE_MONTHLY = "MONTHLY"
 
 private data class AgendaItem(
     val id: Long,
     val title: String,
     val amount: Double?,
     val dueAt: Long,
-    val completed: Boolean = false
+    val completed: Boolean = false,
+    val recurrence: String = RECURRENCE_NONE
 )
 
 private fun loadAgendaItems(context: Context): List<AgendaItem> {
@@ -68,7 +71,8 @@ private fun loadAgendaItems(context: Context): List<AgendaItem> {
                     title = item.optString("title", "Lembrete"),
                     amount = if (item.has("amount")) item.optDouble("amount") else null,
                     dueAt = item.optLong("dueAt", 0L),
-                    completed = item.optBoolean("completed", false)
+                    completed = item.optBoolean("completed", false),
+                    recurrence = item.optString("recurrence", RECURRENCE_NONE)
                 )
             )
         }
@@ -84,6 +88,7 @@ private fun saveAgendaItems(context: Context, items: List<AgendaItem>) {
                 .put("title", item.title)
                 .put("dueAt", item.dueAt)
                 .put("completed", item.completed)
+                .put("recurrence", item.recurrence)
                 .apply { item.amount?.let { put("amount", it) } }
         )
     }
@@ -107,6 +112,20 @@ private fun formatAgendaDate(timestamp: Long): String =
 
 private fun formatAgendaTime(timestamp: Long): String =
     SimpleDateFormat("HH:mm", Locale("pt", "BR")).format(Date(timestamp))
+
+private fun nextMonthlyOccurrence(timestamp: Long, after: Long = System.currentTimeMillis()): Long {
+    val calendar = Calendar.getInstance().apply { timeInMillis = timestamp }
+    val preferredDay = calendar.get(Calendar.DAY_OF_MONTH)
+    do {
+        calendar.set(Calendar.DAY_OF_MONTH, 1)
+        calendar.add(Calendar.MONTH, 1)
+        calendar.set(
+            Calendar.DAY_OF_MONTH,
+            minOf(preferredDay, calendar.getActualMaximum(Calendar.DAY_OF_MONTH))
+        )
+    } while (calendar.timeInMillis <= after)
+    return calendar.timeInMillis
+}
 
 private fun agendaPendingIntent(context: Context, item: AgendaItem): PendingIntent {
     val intent = Intent(context, AgendaReminderReceiver::class.java)
@@ -148,6 +167,7 @@ fun AgendaScreen() {
     var amountText by remember { mutableStateOf("") }
     var dateText by remember { mutableStateOf("") }
     var timeText by remember { mutableStateOf("09:00") }
+    var recurrence by remember { mutableStateOf(RECURRENCE_NONE) }
 
     fun clearEditor() {
         editingItem = null
@@ -155,6 +175,7 @@ fun AgendaScreen() {
         amountText = ""
         dateText = ""
         timeText = "09:00"
+        recurrence = RECURRENCE_NONE
         showEditorDialog = false
     }
 
@@ -164,6 +185,7 @@ fun AgendaScreen() {
         amountText = ""
         dateText = ""
         timeText = "09:00"
+        recurrence = RECURRENCE_NONE
         showEditorDialog = true
     }
 
@@ -173,6 +195,7 @@ fun AgendaScreen() {
         amountText = item.amount?.toString()?.replace('.', ',') ?: ""
         dateText = formatAgendaDate(item.dueAt)
         timeText = formatAgendaTime(item.dueAt)
+        recurrence = item.recurrence
         showEditorDialog = true
     }
 
@@ -268,6 +291,34 @@ fun AgendaScreen() {
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Text("Repetição", style = MaterialTheme.typography.labelLarge)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (recurrence == RECURRENCE_NONE) {
+                            Button(
+                                onClick = { recurrence = RECURRENCE_NONE },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Não repetir") }
+                        } else {
+                            OutlinedButton(
+                                onClick = { recurrence = RECURRENCE_NONE },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Não repetir") }
+                        }
+                        if (recurrence == RECURRENCE_MONTHLY) {
+                            Button(
+                                onClick = { recurrence = RECURRENCE_MONTHLY },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Mensal") }
+                        } else {
+                            OutlinedButton(
+                                onClick = { recurrence = RECURRENCE_MONTHLY },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Mensal") }
+                        }
+                    }
                     if ((dateText.isNotBlank() || timeText.isNotBlank()) && parsedDateTime == null) {
                         Text(
                             "Use data e horário válidos, por exemplo 10/09/2026 às 09:00.",
@@ -295,13 +346,15 @@ fun AgendaScreen() {
                                 id = System.currentTimeMillis(),
                                 title = title.trim(),
                                 amount = parsedAmount,
-                                dueAt = dueAt
+                                dueAt = dueAt,
+                                recurrence = recurrence
                             )
                         } else {
                             currentEditingItem.copy(
                                 title = title.trim(),
                                 amount = parsedAmount,
-                                dueAt = dueAt
+                                dueAt = dueAt,
+                                recurrence = recurrence
                             )
                         }
 
@@ -361,7 +414,7 @@ fun AgendaScreen() {
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    "Crie lembretes com data e horário para contas, vencimentos e compromissos.",
+                    "Crie lembretes únicos ou mensais para contas, vencimentos e compromissos.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -435,6 +488,13 @@ fun AgendaScreen() {
                                 MaterialTheme.colorScheme.primary
                             }
                         )
+                        if (item.recurrence == RECURRENCE_MONTHLY) {
+                            Text(
+                                "Repete todo mês",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         item.amount?.let {
                             Text(
                                 formatCurrency(it),
@@ -462,15 +522,34 @@ fun AgendaScreen() {
                         Button(
                             onClick = {
                                 cancelAgendaReminder(context, item)
-                                val updated = items.map {
-                                    if (it.id == item.id) it.copy(completed = true) else it
+                                val completed = item.copy(completed = true)
+                                val updatedItems = items.map {
+                                    if (it.id == item.id) completed else it
+                                }.toMutableList()
+
+                                if (item.recurrence == RECURRENCE_MONTHLY) {
+                                    val nextItem = item.copy(
+                                        id = System.currentTimeMillis(),
+                                        dueAt = nextMonthlyOccurrence(item.dueAt),
+                                        completed = false
+                                    )
+                                    updatedItems.add(nextItem)
+                                    scheduleAgendaReminder(context, nextItem)
                                 }
+
+                                val updated = updatedItems.sortedBy { it.dueAt }
                                 saveAgendaItems(context, updated)
                                 items = updated
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Marcar como concluído")
+                            Text(
+                                if (item.recurrence == RECURRENCE_MONTHLY) {
+                                    "Concluir e criar próximo mês"
+                                } else {
+                                    "Marcar como concluído"
+                                }
+                            )
                         }
                     }
                 }
@@ -496,6 +575,13 @@ fun AgendaScreen() {
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        if (item.recurrence == RECURRENCE_MONTHLY) {
+                            Text(
+                                "Recorrência mensal mantida no próximo lembrete",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         item.amount?.let {
                             Text(formatCurrency(it), style = MaterialTheme.typography.titleSmall)
                         }
@@ -503,18 +589,20 @@ fun AgendaScreen() {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            OutlinedButton(
-                                onClick = {
-                                    val reopened = item.copy(completed = false)
-                                    val updated = items.map { if (it.id == item.id) reopened else it }
-                                    saveAgendaItems(context, updated)
-                                    scheduleAgendaReminder(context, reopened)
-                                    items = updated
-                                },
-                                enabled = item.dueAt > System.currentTimeMillis(),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Reabrir")
+                            if (item.recurrence != RECURRENCE_MONTHLY) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val reopened = item.copy(completed = false)
+                                        val updated = items.map { if (it.id == item.id) reopened else it }
+                                        saveAgendaItems(context, updated)
+                                        scheduleAgendaReminder(context, reopened)
+                                        items = updated
+                                    },
+                                    enabled = item.dueAt > System.currentTimeMillis(),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Reabrir")
+                                }
                             }
                             OutlinedButton(
                                 onClick = { deletingItem = item },
@@ -539,7 +627,7 @@ fun AgendaScreen() {
             ) {
                 Text("Teste operacional", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Crie, edite ou exclua um lembrete e teste a notificação com o app fechado.",
+                    "Teste um lembrete mensal: ao concluir, o Contai deve criar e agendar automaticamente a próxima ocorrência.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
