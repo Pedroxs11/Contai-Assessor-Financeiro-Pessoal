@@ -1,8 +1,10 @@
 package com.contai.financeiro
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +17,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +37,7 @@ fun CaptureDiagnosticsCard() {
     val lastEvent = prefs.getString("listener_lifecycle_event", "Sem registro") ?: "Sem registro"
     val lastEventAt = prefs.getLong("listener_lifecycle_at", 0L)
     val aliveRecently = connected && lastAliveAt > 0L && System.currentTimeMillis() - lastAliveAt <= 45_000L
+    var recoveryFeedback by remember { mutableStateOf<String?>(null) }
 
     fun formattedTime(timestamp: Long): String = if (timestamp <= 0L) {
         "Ainda não registrado"
@@ -74,6 +81,46 @@ fun CaptureDiagnosticsCard() {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            if (!aliveRecently) {
+                OutlinedButton(
+                    onClick = {
+                        val listenerComponent = ComponentName(
+                            context,
+                            FinanceNotificationListener::class.java
+                        )
+                        val enabledListeners = Settings.Secure.getString(
+                            context.contentResolver,
+                            "enabled_notification_listeners"
+                        ).orEmpty()
+                        val listenerEnabled = enabledListeners
+                            .split(':')
+                            .any { it == listenerComponent.flattenToString() }
+
+                        if (listenerEnabled) {
+                            prefs.edit()
+                                .putString("listener_lifecycle_event", "manualRebindRequested")
+                                .putLong("listener_lifecycle_at", System.currentTimeMillis())
+                                .apply()
+                            NotificationListenerService.requestRebind(listenerComponent)
+                            recoveryFeedback = "Tentativa de reativação enviada ao Android."
+                        } else {
+                            recoveryFeedback = "Ative primeiro o acesso às notificações do Contai."
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Tentar reativar captura")
+                }
+            }
+
+            recoveryFeedback?.let { feedback ->
+                Text(
+                    feedback,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             OutlinedButton(
                 onClick = {
