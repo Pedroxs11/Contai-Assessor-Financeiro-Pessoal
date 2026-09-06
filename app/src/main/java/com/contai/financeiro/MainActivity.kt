@@ -238,11 +238,103 @@ fun ContaiApp(hideValuesByDefault: Boolean = false) {
             Card(modifier = Modifier.weight(1f), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Column(modifier = Modifier.padding(18.dp)) { Text("Despesas", color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(modifier = Modifier.height(8.dp)); Text(if (showValues) formatCurrency(totalExpense) else "R$ ••••••", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.error); Spacer(modifier = Modifier.height(4.dp)); Text("Confirmadas", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         }; Spacer(modifier = Modifier.height(12.dp))
         Card(modifier = Modifier.fillMaxWidth(), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) { Row(modifier = Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Column { Text("Proventos do mês", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(modifier = Modifier.height(8.dp)); Text(if (showValues) formatCurrency(monthlyProceeds) else "R$ ••••••", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary) }; Text("Investimentos", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }; Spacer(modifier = Modifier.height(20.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { if (selectedSection == "PENDENCIAS") Button({ selectedSection = "PENDENCIAS" }, modifier = Modifier.weight(1f)) { Text("Pendências") } else OutlinedButton({ selectedSection = "PENDENCIAS" }, modifier = Modifier.weight(1f)) { Text("Pendências") }; if (selectedSection == "HISTORICO") Button({ selectedSection = "HISTORICO" }, modifier = Modifier.weight(1f)) { Text("Histórico") } else OutlinedButton({ selectedSection = "HISTORICO" }, modifier = Modifier.weight(1f)) { Text("Histórico") } }; Spacer(modifier = Modifier.height(16.dp))
-        if (selectedSection == "HISTORICO") { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { FilterChip(historyFilter == "TODOS", { historyFilter = "TODOS" }, label = { Text("Todos") }, modifier = Modifier.weight(1f)); FilterChip(historyFilter == "ENTRADAS", { historyFilter = "ENTRADAS" }, label = { Text("Entradas") }, modifier = Modifier.weight(1f)) }; Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { FilterChip(historyFilter == "DESPESAS", { historyFilter = "DESPESAS" }, label = { Text("Despesas") }, modifier = Modifier.weight(1f)); FilterChip(historyFilter == "PROVENTOS", { historyFilter = "PROVENTOS" }, label = { Text("Proventos") }, modifier = Modifier.weight(1f)) }; Spacer(modifier = Modifier.height(8.dp)) }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (selectedSection == "PENDENCIAS") {
+                    Button(
+                        onClick = { selectedSection = "PENDENCIAS" },
+                        modifier = Modifier.weight(1f),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) { Text("Pendências") }
+                } else {
+                    TextButton(
+                        onClick = { selectedSection = "PENDENCIAS" },
+                        modifier = Modifier.weight(1f),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ) { Text("Pendências") }
+                }
+
+                if (selectedSection == "HISTORICO") {
+                    Button(
+                        onClick = { selectedSection = "HISTORICO" },
+                        modifier = Modifier.weight(1f),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) { Text("Histórico") }
+                } else {
+                    TextButton(
+                        onClick = { selectedSection = "HISTORICO" },
+                        modifier = Modifier.weight(1f),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ) { Text("Histórico") }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (selectedSection == "HISTORICO") {
+            Text("Filtrar histórico", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(historyFilter == "TODOS", { historyFilter = "TODOS" }, label = { Text("Todos") }, modifier = Modifier.weight(1f))
+                FilterChip(historyFilter == "ENTRADAS", { historyFilter = "ENTRADAS" }, label = { Text("Entradas") }, modifier = Modifier.weight(1f))
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(historyFilter == "DESPESAS", { historyFilter = "DESPESAS" }, label = { Text("Despesas") }, modifier = Modifier.weight(1f))
+                FilterChip(historyFilter == "PROVENTOS", { historyFilter = "PROVENTOS" }, label = { Text("Proventos") }, modifier = Modifier.weight(1f))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         val displayedTransactions = if (selectedSection == "PENDENCIAS") transactionHistory.filter { it.status == "POSSIVEL" } else { val confirmed = transactionHistory.filter { it.status == "CONFIRMADA" }; when (historyFilter) { "ENTRADAS" -> confirmed.filter { it.type == "ENTRADA" && it.investmentType.isBlank() }; "DESPESAS" -> confirmed.filter { it.type == "DESPESA" }; "PROVENTOS" -> confirmed.filter { it.investmentType.isNotBlank() }; else -> confirmed } }
         if (displayedTransactions.isEmpty()) {
-            Text(if (selectedSection == "PENDENCIAS") "Nenhuma transação pendente." else "Nenhuma transação encontrada neste filtro.")
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        if (selectedSection == "PENDENCIAS") "✓" else "—",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = if (selectedSection == "PENDENCIAS") MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        if (selectedSection == "PENDENCIAS") "Tudo certo por aqui" else "Nenhum lançamento encontrado",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        if (selectedSection == "PENDENCIAS") "Quando uma transação precisar da sua confirmação, ela aparecerá aqui." else "Tente outro filtro ou adicione um novo lançamento.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         } else {
             GroupedHistoryTransactions(
                 transactions = displayedTransactions,
