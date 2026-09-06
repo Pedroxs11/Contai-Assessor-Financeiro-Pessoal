@@ -157,10 +157,7 @@ private fun ContaiShell(
         ) {
             when (selectedDestination) {
                 ContaiDestination.HOME -> ContaiApp(hideValuesByDefault = hideValues)
-                ContaiDestination.AGENDA -> DestinationPlaceholder(
-                    title = "Agenda",
-                    description = "Seus compromissos e lembretes ficarão aqui."
-                )
+                ContaiDestination.AGENDA -> AgendaScreen()
                 ContaiDestination.REPORTS -> ReportsScreen(hideValues = hideValues)
                 ContaiDestination.PROFILE -> ProfileScreen(
                     themeMode = themeMode,
