@@ -1,6 +1,14 @@
 package com.contai.financeiro
 
+import android.Manifest
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -84,14 +93,43 @@ private fun saveAgendaItems(context: Context, items: List<AgendaItem>) {
         .apply()
 }
 
-private fun parseAgendaDate(value: String): Long? = runCatching {
-    SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR")).apply {
+private fun parseAgendaDateTime(dateValue: String, timeValue: String): Long? = runCatching {
+    SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("pt", "BR")).apply {
         isLenient = false
-    }.parse(value.trim())?.time
+    }.parse("${dateValue.trim()} ${timeValue.trim()}")?.time
 }.getOrNull()
 
-private fun formatAgendaDate(timestamp: Long): String =
-    SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR")).format(Date(timestamp))
+private fun formatAgendaDateTime(timestamp: Long): String =
+    SimpleDateFormat("dd/MM/yyyy • HH:mm", Locale("pt", "BR")).format(Date(timestamp))
+
+private fun agendaPendingIntent(context: Context, item: AgendaItem): PendingIntent {
+    val intent = Intent(context, AgendaReminderReceiver::class.java)
+        .putExtra("itemId", item.id)
+        .putExtra("title", item.title)
+        .apply { item.amount?.let { putExtra("amount", it) } }
+
+    return PendingIntent.getBroadcast(
+        context,
+        item.id.hashCode(),
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+}
+
+private fun scheduleAgendaReminder(context: Context, item: AgendaItem) {
+    if (item.completed || item.dueAt <= System.currentTimeMillis()) return
+    val alarmManager = context.getSystemService(AlarmManager::class.java)
+    alarmManager.setAndAllowWhileIdle(
+        AlarmManager.RTC_WAKEUP,
+        item.dueAt,
+        agendaPendingIntent(context, item)
+    )
+}
+
+private fun cancelAgendaReminder(context: Context, item: AgendaItem) {
+    val alarmManager = context.getSystemService(AlarmManager::class.java)
+    alarmManager.cancel(agendaPendingIntent(context, item))
+}
 
 @Composable
 fun AgendaScreen() {
@@ -101,6 +139,12 @@ fun AgendaScreen() {
     var title by remember { mutableStateOf("") }
     var amountText by remember { mutableStateOf("") }
     var dateText by remember { mutableStateOf("") }
+    var timeText by remember { mutableStateOf("09:00") }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { }
+    )
 
     val todayStart = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0)
@@ -110,19 +154,14 @@ fun AgendaScreen() {
     }.timeInMillis
     val tomorrowStart = todayStart + 24 * 60 * 60 * 1000L
     val activeItems = items.filterNot { it.completed }
+    val completedItems = items.filter { it.completed }.sortedByDescending { it.dueAt }
     val todayItems = activeItems.filter { it.dueAt in todayStart until tomorrowStart }
     val upcomingItems = activeItems.filter { it.dueAt >= tomorrowStart }
 
     if (showAddDialog) {
-        val parsedDate = parseAgendaDate(dateText)
-        val parsedAmount = amountText
-            .trim()
-            .replace("R$", "", ignoreCase = true)
-            .replace(" ", "")
-            .replace(".", "")
-            .replace(",", ".")
-            .takeIf { it.isNotBlank() }
-            ?.toDoubleOrNull()
+        val parsedDateTime = parseAgendaDateTime(dateText, timeText)
+        val parsedAmount = parseBrazilianAmount(amountText).takeIf { amountText.isNotBlank() }
+        val invalidAmount = amountText.isNotBlank() && parsedAmount == null
 
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -144,6 +183,13 @@ fun AgendaScreen() {
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    if (invalidAmount) {
+                        Text(
+                            "Digite um valor válido, por exemplo 250,00.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                     OutlinedTextField(
                         value = dateText,
                         onValueChange = { dateText = it },
@@ -152,9 +198,24 @@ fun AgendaScreen() {
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    if (dateText.isNotBlank() && parsedDate == null) {
+                    OutlinedTextField(
+                        value = timeText,
+                        onValueChange = { timeText = it },
+                        label = { Text("Horário") },
+                        placeholder = { Text("hh:mm") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if ((dateText.isNotBlank() || timeText.isNotBlank()) && parsedDateTime == null) {
                         Text(
-                            "Use uma data válida no formato dd/mm/aaaa.",
+                            "Use data e horário válidos, por exemplo 10/09/2026 às 09:00.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    if (parsedDateTime != null && parsedDateTime <= System.currentTimeMillis()) {
+                        Text(
+                            "O lembrete precisa estar no futuro.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
                         )
@@ -164,7 +225,8 @@ fun AgendaScreen() {
             confirmButton = {
                 Button(
                     onClick = {
-                        val dueAt = parsedDate ?: return@Button
+                        val dueAt = parsedDateTime ?: return@Button
+                        if (dueAt <= System.currentTimeMillis()) return@Button
                         val newItem = AgendaItem(
                             id = System.currentTimeMillis(),
                             title = title.trim(),
@@ -173,13 +235,18 @@ fun AgendaScreen() {
                         )
                         val updated = (items + newItem).sortedBy { it.dueAt }
                         saveAgendaItems(context, updated)
+                        scheduleAgendaReminder(context, newItem)
                         items = updated
                         title = ""
                         amountText = ""
                         dateText = ""
+                        timeText = "09:00"
                         showAddDialog = false
                     },
-                    enabled = title.isNotBlank() && parsedDate != null
+                    enabled = title.isNotBlank() &&
+                        parsedDateTime != null &&
+                        parsedDateTime > System.currentTimeMillis() &&
+                        !invalidAmount
                 ) {
                     Text("Salvar")
                 }
@@ -220,11 +287,22 @@ fun AgendaScreen() {
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    "Crie lembretes locais para contas, vencimentos e compromissos.",
+                    "Crie lembretes com data e horário para contas, vencimentos e compromissos.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Button(onClick = { showAddDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = {
+                        if (
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        showAddDialog = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text("+ Novo lembrete")
                 }
             }
@@ -239,27 +317,13 @@ fun AgendaScreen() {
         }
 
         Spacer(Modifier.height(4.dp))
-
         Text("Seus lembretes", style = MaterialTheme.typography.titleMedium)
 
         if (activeItems.isEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text("Nada agendado", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Crie seu primeiro lembrete financeiro para testar a Agenda no dia a dia.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            AgendaEmptyCard(
+                title = "Nada agendado",
+                description = "Crie seu primeiro lembrete financeiro para testar a Agenda no dia a dia."
+            )
         } else {
             activeItems.forEach { item ->
                 Card(
@@ -269,11 +333,11 @@ fun AgendaScreen() {
                 ) {
                     Column(
                         modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(item.title, style = MaterialTheme.typography.titleMedium)
                         Text(
-                            formatAgendaDate(item.dueAt),
+                            formatAgendaDateTime(item.dueAt),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -283,6 +347,59 @@ fun AgendaScreen() {
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                        }
+                        Button(
+                            onClick = {
+                                cancelAgendaReminder(context, item)
+                                val updated = items.map {
+                                    if (it.id == item.id) it.copy(completed = true) else it
+                                }
+                                saveAgendaItems(context, updated)
+                                items = updated
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Marcar como concluído")
+                        }
+                    }
+                }
+            }
+        }
+
+        if (completedItems.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            Text("Concluídos", style = MaterialTheme.typography.titleMedium)
+            completedItems.take(5).forEach { item ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(item.title, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Concluído • ${formatAgendaDateTime(item.dueAt)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        item.amount?.let {
+                            Text(formatCurrency(it), style = MaterialTheme.typography.titleSmall)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                val reopened = item.copy(completed = false)
+                                val updated = items.map { if (it.id == item.id) reopened else it }
+                                saveAgendaItems(context, updated)
+                                scheduleAgendaReminder(context, reopened)
+                                items = updated
+                            },
+                            enabled = item.dueAt > System.currentTimeMillis(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Reabrir")
                         }
                     }
                 }
@@ -298,9 +415,9 @@ fun AgendaScreen() {
                 modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text("Próximo passo", style = MaterialTheme.typography.titleMedium)
+                Text("Teste operacional", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Adicionar horário, marcar como concluído e disparar a notificação local do lembrete.",
+                    "Crie um lembrete para alguns minutos à frente e deixe o app fechado. A notificação local deve aparecer próxima do horário agendado.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -326,6 +443,27 @@ private fun AgendaInfoCard(title: String, value: String, modifier: Modifier = Mo
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(value, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+@Composable
+private fun AgendaEmptyCard(title: String, description: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
