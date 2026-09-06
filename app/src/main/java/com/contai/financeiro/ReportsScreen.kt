@@ -6,15 +6,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.json.JSONArray
@@ -55,7 +60,9 @@ fun ReportsScreen(hideValues: Boolean) {
 
     for (i in 0 until history.length()) {
         val item = history.optJSONObject(i) ?: continue
-        if (item.optString("status") != "CONFIRMADA") continue
+        val classification = item.optString("classification", item.optString("status", ""))
+        if (classification != "CONFIRMADA") continue
+
         val timestamp = item.optLong("timestamp", 0L)
         if (period == ReportPeriod.MONTH && timestamp < monthStart) continue
 
@@ -82,25 +89,33 @@ fun ReportsScreen(hideValues: Boolean) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Relatórios", style = MaterialTheme.typography.headlineMedium)
-        Text("Visão geral dos seus lançamentos confirmados.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "Acompanhe o movimento do seu dinheiro.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ReportPeriod.entries.forEach { option ->
                 FilterChip(
                     selected = period == option,
                     onClick = { period = option },
-                    label = { Text(option.label) }
+                    label = { Text(option.label) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 )
             }
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ReportCard("Entradas", valueText(income), Modifier.weight(1f))
-            ReportCard("Despesas", valueText(expenses), Modifier.weight(1f))
+            ReportCard("Entradas", valueText(income), Modifier.weight(1f), MaterialTheme.colorScheme.secondary)
+            ReportCard("Despesas", valueText(expenses), Modifier.weight(1f), MaterialTheme.colorScheme.error)
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ReportCard("Saldo", valueText(income - expenses), Modifier.weight(1f))
-            ReportCard("Proventos", valueText(proceeds), Modifier.weight(1f))
+            ReportCard("Saldo", valueText(income - expenses), Modifier.weight(1f), MaterialTheme.colorScheme.primary)
+            ReportCard("Proventos", valueText(proceeds), Modifier.weight(1f), MaterialTheme.colorScheme.primary)
         }
 
         IncomeExpenseChart(income = income, expenses = expenses, hideValues = hideValues)
@@ -115,13 +130,61 @@ private fun IncomeExpenseChart(income: Double, expenses: Double, hideValues: Boo
     val incomeRatio = (income / maxValue).toFloat().coerceIn(0f, 1f)
     val expenseRatio = (expenses / maxValue).toFloat().coerceIn(0f, 1f)
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("Entradas × Despesas", style = MaterialTheme.typography.titleMedium)
-            Text("Comparativo dos lançamentos confirmados.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            ChartBar("Entradas", incomeRatio, if (hideValues) "R$ ••••" else formatCurrency(income), true)
-            ChartBar("Despesas", expenseRatio, if (hideValues) "R$ ••••" else formatCurrency(expenses), false)
+            Text(
+                "Comparação visual do período selecionado.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth().height(190.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                VerticalChartBar(
+                    label = "Entradas",
+                    value = if (hideValues) "R$ ••••" else formatCurrency(income),
+                    ratio = incomeRatio,
+                    barColor = MaterialTheme.colorScheme.secondary
+                )
+                VerticalChartBar(
+                    label = "Despesas",
+                    value = if (hideValues) "R$ ••••" else formatCurrency(expenses),
+                    ratio = expenseRatio,
+                    barColor = MaterialTheme.colorScheme.error
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun VerticalChartBar(
+    label: String,
+    value: String,
+    ratio: Float,
+    barColor: androidx.compose.ui.graphics.Color
+) {
+    val barHeight = (112f * ratio).coerceAtLeast(6f).dp
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.labelMedium)
+        Spacer(Modifier.height(8.dp))
+        Box(
+            modifier = Modifier
+                .width(62.dp)
+                .height(barHeight)
+                .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp, bottomStart = 6.dp, bottomEnd = 6.dp))
+                .background(barColor)
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -130,15 +193,31 @@ private fun ExpensesByCategoryChart(expensesByCategory: Map<String, Double>, hid
     val sortedCategories = expensesByCategory.entries.sortedByDescending { it.value }
     val maxValue = maxOf(sortedCategories.maxOfOrNull { it.value } ?: 0.0, 1.0)
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("Despesas por categoria", style = MaterialTheme.typography.titleMedium)
-            Text("Veja onde seu dinheiro está sendo mais utilizado.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Veja onde seu dinheiro está sendo mais utilizado.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             if (sortedCategories.isEmpty()) {
-                Text("Nenhuma despesa confirmada neste período.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "Nenhuma despesa confirmada neste período.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             } else {
                 sortedCategories.forEach { (category, value) ->
-                    ChartBar(category, (value / maxValue).toFloat().coerceIn(0f, 1f), if (hideValues) "R$ ••••" else formatCurrency(value), false)
+                    ChartBar(
+                        category,
+                        (value / maxValue).toFloat().coerceIn(0f, 1f),
+                        if (hideValues) "R$ ••••" else formatCurrency(value)
+                    )
                 }
             }
         }
@@ -147,35 +226,70 @@ private fun ExpensesByCategoryChart(expensesByCategory: Map<String, Double>, hid
 
 @Composable
 private fun ProceedsCard(proceeds: Double, hideValues: Boolean, periodLabel: String) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Proventos", style = MaterialTheme.typography.titleMedium)
-            Text("Dividendos, JCP e rendimentos • $periodLabel", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(if (hideValues) "R$ ••••" else formatCurrency(proceeds), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+            Text(
+                "Dividendos, JCP e rendimentos • $periodLabel",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                if (hideValues) "R$ ••••" else formatCurrency(proceeds),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }
 
 @Composable
-private fun ChartBar(label: String, ratio: Float, value: String, usePrimary: Boolean) {
-    val barColor = if (usePrimary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+private fun ChartBar(label: String, ratio: Float, value: String) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, style = MaterialTheme.typography.labelLarge)
             Text(value, style = MaterialTheme.typography.labelLarge)
         }
-        Box(modifier = Modifier.fillMaxWidth().height(12.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(999.dp)), contentAlignment = Alignment.CenterStart) {
-            Box(modifier = Modifier.fillMaxWidth(ratio).height(12.dp).background(barColor, RoundedCornerShape(999.dp)))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(10.dp)
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(999.dp)),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(ratio)
+                    .height(10.dp)
+                    .background(MaterialTheme.colorScheme.error, RoundedCornerShape(999.dp))
+            )
         }
     }
 }
 
 @Composable
-private fun ReportCard(title: String, value: String, modifier: Modifier = Modifier) {
-    Card(modifier = modifier) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.titleLarge)
+private fun ReportCard(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    accentColor: androidx.compose.ui.graphics.Color
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(value, style = MaterialTheme.typography.titleLarge, color = accentColor)
         }
     }
 }
