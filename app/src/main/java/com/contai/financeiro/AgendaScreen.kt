@@ -102,6 +102,12 @@ private fun parseAgendaDateTime(dateValue: String, timeValue: String): Long? = r
 private fun formatAgendaDateTime(timestamp: Long): String =
     SimpleDateFormat("dd/MM/yyyy • HH:mm", Locale("pt", "BR")).format(Date(timestamp))
 
+private fun formatAgendaDate(timestamp: Long): String =
+    SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR")).format(Date(timestamp))
+
+private fun formatAgendaTime(timestamp: Long): String =
+    SimpleDateFormat("HH:mm", Locale("pt", "BR")).format(Date(timestamp))
+
 private fun agendaPendingIntent(context: Context, item: AgendaItem): PendingIntent {
     val intent = Intent(context, AgendaReminderReceiver::class.java)
         .putExtra("itemId", item.id)
@@ -135,11 +141,40 @@ private fun cancelAgendaReminder(context: Context, item: AgendaItem) {
 fun AgendaScreen() {
     val context = LocalContext.current
     var items by remember { mutableStateOf(loadAgendaItems(context)) }
-    var showAddDialog by remember { mutableStateOf(false) }
+    var showEditorDialog by remember { mutableStateOf(false) }
+    var editingItem by remember { mutableStateOf<AgendaItem?>(null) }
+    var deletingItem by remember { mutableStateOf<AgendaItem?>(null) }
     var title by remember { mutableStateOf("") }
     var amountText by remember { mutableStateOf("") }
     var dateText by remember { mutableStateOf("") }
     var timeText by remember { mutableStateOf("09:00") }
+
+    fun clearEditor() {
+        editingItem = null
+        title = ""
+        amountText = ""
+        dateText = ""
+        timeText = "09:00"
+        showEditorDialog = false
+    }
+
+    fun openNewReminder() {
+        editingItem = null
+        title = ""
+        amountText = ""
+        dateText = ""
+        timeText = "09:00"
+        showEditorDialog = true
+    }
+
+    fun openEditReminder(item: AgendaItem) {
+        editingItem = item
+        title = item.title
+        amountText = item.amount?.toString()?.replace('.', ',') ?: ""
+        dateText = formatAgendaDate(item.dueAt)
+        timeText = formatAgendaTime(item.dueAt)
+        showEditorDialog = true
+    }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -158,14 +193,39 @@ fun AgendaScreen() {
     val todayItems = activeItems.filter { it.dueAt in todayStart until tomorrowStart }
     val upcomingItems = activeItems.filter { it.dueAt >= tomorrowStart }
 
-    if (showAddDialog) {
+    deletingItem?.let { item ->
+        AlertDialog(
+            onDismissRequest = { deletingItem = null },
+            title = { Text("Excluir lembrete?") },
+            text = { Text("O lembrete “${item.title}” será removido da Agenda.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        cancelAgendaReminder(context, item)
+                        val updated = items.filterNot { it.id == item.id }
+                        saveAgendaItems(context, updated)
+                        items = updated
+                        deletingItem = null
+                    }
+                ) {
+                    Text("Excluir", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingItem = null }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    if (showEditorDialog) {
         val parsedDateTime = parseAgendaDateTime(dateText, timeText)
         val parsedAmount = parseBrazilianAmount(amountText).takeIf { amountText.isNotBlank() }
         val invalidAmount = amountText.isNotBlank() && parsedAmount == null
+        val currentEditingItem = editingItem
 
         AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = { Text("Novo lembrete") },
+            onDismissRequest = { clearEditor() },
+            title = { Text(if (currentEditingItem == null) "Novo lembrete" else "Editar lembrete") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
@@ -227,32 +287,44 @@ fun AgendaScreen() {
                     onClick = {
                         val dueAt = parsedDateTime ?: return@Button
                         if (dueAt <= System.currentTimeMillis()) return@Button
-                        val newItem = AgendaItem(
-                            id = System.currentTimeMillis(),
-                            title = title.trim(),
-                            amount = parsedAmount,
-                            dueAt = dueAt
-                        )
-                        val updated = (items + newItem).sortedBy { it.dueAt }
+
+                        val savedItem = if (currentEditingItem == null) {
+                            AgendaItem(
+                                id = System.currentTimeMillis(),
+                                title = title.trim(),
+                                amount = parsedAmount,
+                                dueAt = dueAt
+                            )
+                        } else {
+                            currentEditingItem.copy(
+                                title = title.trim(),
+                                amount = parsedAmount,
+                                dueAt = dueAt
+                            )
+                        }
+
+                        currentEditingItem?.let { cancelAgendaReminder(context, it) }
+                        val updated = if (currentEditingItem == null) {
+                            (items + savedItem).sortedBy { it.dueAt }
+                        } else {
+                            items.map { if (it.id == currentEditingItem.id) savedItem else it }
+                                .sortedBy { it.dueAt }
+                        }
                         saveAgendaItems(context, updated)
-                        scheduleAgendaReminder(context, newItem)
+                        scheduleAgendaReminder(context, savedItem)
                         items = updated
-                        title = ""
-                        amountText = ""
-                        dateText = ""
-                        timeText = "09:00"
-                        showAddDialog = false
+                        clearEditor()
                     },
                     enabled = title.isNotBlank() &&
                         parsedDateTime != null &&
                         parsedDateTime > System.currentTimeMillis() &&
                         !invalidAmount
                 ) {
-                    Text("Salvar")
+                    Text(if (currentEditingItem == null) "Salvar" else "Salvar alterações")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) { Text("Cancelar") }
+                TextButton(onClick = { clearEditor() }) { Text("Cancelar") }
             }
         )
     }
@@ -299,7 +371,7 @@ fun AgendaScreen() {
                         ) {
                             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
-                        showAddDialog = true
+                        openNewReminder()
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -348,6 +420,23 @@ fun AgendaScreen() {
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { openEditReminder(item) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Editar")
+                            }
+                            OutlinedButton(
+                                onClick = { deletingItem = item },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Excluir", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
                         Button(
                             onClick = {
                                 cancelAgendaReminder(context, item)
@@ -388,18 +477,29 @@ fun AgendaScreen() {
                         item.amount?.let {
                             Text(formatCurrency(it), style = MaterialTheme.typography.titleSmall)
                         }
-                        OutlinedButton(
-                            onClick = {
-                                val reopened = item.copy(completed = false)
-                                val updated = items.map { if (it.id == item.id) reopened else it }
-                                saveAgendaItems(context, updated)
-                                scheduleAgendaReminder(context, reopened)
-                                items = updated
-                            },
-                            enabled = item.dueAt > System.currentTimeMillis(),
-                            modifier = Modifier.fillMaxWidth()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("Reabrir")
+                            OutlinedButton(
+                                onClick = {
+                                    val reopened = item.copy(completed = false)
+                                    val updated = items.map { if (it.id == item.id) reopened else it }
+                                    saveAgendaItems(context, updated)
+                                    scheduleAgendaReminder(context, reopened)
+                                    items = updated
+                                },
+                                enabled = item.dueAt > System.currentTimeMillis(),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Reabrir")
+                            }
+                            OutlinedButton(
+                                onClick = { deletingItem = item },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Excluir", color = MaterialTheme.colorScheme.error)
+                            }
                         }
                     }
                 }
@@ -417,7 +517,7 @@ fun AgendaScreen() {
             ) {
                 Text("Teste operacional", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Crie um lembrete para alguns minutos à frente e deixe o app fechado. A notificação local deve aparecer próxima do horário agendado.",
+                    "Crie, edite ou exclua um lembrete e teste a notificação com o app fechado.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
