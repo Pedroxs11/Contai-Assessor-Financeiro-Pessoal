@@ -181,6 +181,7 @@ fun AgendaScreen() {
         onResult = { }
     )
 
+    val now = System.currentTimeMillis()
     val todayStart = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0)
         set(Calendar.MINUTE, 0)
@@ -190,6 +191,7 @@ fun AgendaScreen() {
     val tomorrowStart = todayStart + 24 * 60 * 60 * 1000L
     val activeItems = items.filterNot { it.completed }
     val completedItems = items.filter { it.completed }.sortedByDescending { it.dueAt }
+    val overdueItems = activeItems.filter { it.dueAt < now }
     val todayItems = activeItems.filter { it.dueAt in todayStart until tomorrowStart }
     val upcomingItems = activeItems.filter { it.dueAt >= tomorrowStart }
 
@@ -387,6 +389,12 @@ fun AgendaScreen() {
             AgendaInfoCard("Hoje", "${todayItems.size} lembrete(s)", Modifier.weight(1f))
             AgendaInfoCard("Próximos", "${upcomingItems.size} agendado(s)", Modifier.weight(1f))
         }
+        AgendaInfoCard(
+            title = "Atrasados",
+            value = "${overdueItems.size} pendente(s)",
+            modifier = Modifier.fillMaxWidth(),
+            emphasized = overdueItems.isNotEmpty()
+        )
 
         Spacer(Modifier.height(4.dp))
         Text("Seus lembretes", style = MaterialTheme.typography.titleMedium)
@@ -398,10 +406,16 @@ fun AgendaScreen() {
             )
         } else {
             activeItems.forEach { item ->
+                val isOverdue = item.dueAt < now
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    border = if (isOverdue) {
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.65f))
+                    } else {
+                        null
+                    }
                 ) {
                     Column(
                         modifier = Modifier.padding(18.dp),
@@ -409,9 +423,17 @@ fun AgendaScreen() {
                     ) {
                         Text(item.title, style = MaterialTheme.typography.titleMedium)
                         Text(
-                            formatAgendaDateTime(item.dueAt),
+                            if (isOverdue) {
+                                "Atrasado • ${formatAgendaDateTime(item.dueAt)}"
+                            } else {
+                                formatAgendaDateTime(item.dueAt)
+                            },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary
+                            color = if (isOverdue) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            }
                         )
                         item.amount?.let {
                             Text(
@@ -527,11 +549,21 @@ fun AgendaScreen() {
 }
 
 @Composable
-private fun AgendaInfoCard(title: String, value: String, modifier: Modifier = Modifier) {
+private fun AgendaInfoCard(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false
+) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        border = if (emphasized) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.65f))
+        } else {
+            null
+        }
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -540,9 +572,17 @@ private fun AgendaInfoCard(title: String, value: String, modifier: Modifier = Mo
             Text(
                 title,
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (emphasized) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
             )
-            Text(value, style = MaterialTheme.typography.titleMedium)
+            Text(
+                value,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (emphasized) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }
