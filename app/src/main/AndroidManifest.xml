@@ -38,6 +38,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".CaptureWatchdogReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".AgendaBootReceiver"
             android:enabled="true"
             android:exported="false">
