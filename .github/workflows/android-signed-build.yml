@@ -32,11 +32,22 @@ jobs:
           test -n "$CONTAI_KEYSTORE_BASE64"
           printf '%s' "$CONTAI_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/contai-upload.p12"
 
+      - name: Detect signing alias
+        env:
+          CONTAI_STORE_PASSWORD: ${{ secrets.CONTAI_STORE_PASSWORD }}
+        run: |
+          ALIAS=$(LC_ALL=C keytool -list -v \
+            -keystore "$RUNNER_TEMP/contai-upload.p12" \
+            -storepass "$CONTAI_STORE_PASSWORD" \
+            | sed -n 's/^Alias name: //p' \
+            | head -n 1)
+          test -n "$ALIAS"
+          echo "CONTAI_KEY_ALIAS=$ALIAS" >> "$GITHUB_ENV"
+
       - name: Build signed release APK and AAB
         env:
           CONTAI_STORE_FILE: ${{ runner.temp }}/contai-upload.p12
           CONTAI_STORE_PASSWORD: ${{ secrets.CONTAI_STORE_PASSWORD }}
-          CONTAI_KEY_ALIAS: ${{ secrets.CONTAI_KEY_ALIAS }}
           CONTAI_KEY_PASSWORD: ${{ secrets.CONTAI_KEY_PASSWORD }}
         run: ./gradlew assembleRelease bundleRelease
 
