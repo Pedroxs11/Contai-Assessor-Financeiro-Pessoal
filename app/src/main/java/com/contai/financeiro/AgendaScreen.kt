@@ -57,9 +57,10 @@ private const val RECURRENCE_MONTHLY = "MONTHLY"
 private data class AgendaItem(
     val id: Long,
     val title: String,
-    val amount: Double?,
+    val note: String = "",
     val dueAt: Long,
     val completed: Boolean = false,
+    val completedAt: Long? = null,
     val recurrence: String = RECURRENCE_NONE
 )
 
@@ -73,9 +74,10 @@ private fun loadAgendaItems(context: Context): List<AgendaItem> {
                 AgendaItem(
                     id = item.optLong("id", 0L),
                     title = item.optString("title", "Lembrete"),
-                    amount = if (item.has("amount")) item.optDouble("amount") else null,
+                    note = item.optString("note", item.optString("observation", "")),
                     dueAt = item.optLong("dueAt", 0L),
                     completed = item.optBoolean("completed", false),
+                    completedAt = if (item.has("completedAt")) item.optLong("completedAt") else null,
                     recurrence = item.optString("recurrence", RECURRENCE_NONE)
                 )
             )
@@ -90,10 +92,11 @@ private fun saveAgendaItems(context: Context, items: List<AgendaItem>) {
             JSONObject()
                 .put("id", item.id)
                 .put("title", item.title)
+                .put("note", item.note)
                 .put("dueAt", item.dueAt)
                 .put("completed", item.completed)
                 .put("recurrence", item.recurrence)
-                .apply { item.amount?.let { put("amount", it) } }
+                .apply { item.completedAt?.let { put("completedAt", it) } }
         )
     }
     context.getSharedPreferences(AGENDA_PREFS, Context.MODE_PRIVATE)
@@ -143,7 +146,7 @@ private fun agendaPendingIntent(context: Context, item: AgendaItem): PendingInte
     val intent = Intent(context, AgendaReminderReceiver::class.java)
         .putExtra("itemId", item.id)
         .putExtra("title", item.title)
-        .apply { item.amount?.let { putExtra("amount", it) } }
+        .putExtra("note", item.note)
 
     return PendingIntent.getBroadcast(
         context,
@@ -176,7 +179,7 @@ fun AgendaScreen() {
     var editingItem by remember { mutableStateOf<AgendaItem?>(null) }
     var deletingItem by remember { mutableStateOf<AgendaItem?>(null) }
     var title by remember { mutableStateOf("") }
-    var amountText by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
     var dateText by remember { mutableStateOf("") }
     var timeText by remember { mutableStateOf("") }
     var recurrence by remember { mutableStateOf(RECURRENCE_NONE) }
@@ -184,7 +187,7 @@ fun AgendaScreen() {
     fun clearEditor() {
         editingItem = null
         title = ""
-        amountText = ""
+        note = ""
         dateText = ""
         timeText = ""
         recurrence = RECURRENCE_NONE
@@ -195,7 +198,7 @@ fun AgendaScreen() {
         val suggestedAt = System.currentTimeMillis() + 60 * 60 * 1000L
         editingItem = null
         title = ""
-        amountText = ""
+        note = ""
         dateText = formatAgendaDate(suggestedAt)
         timeText = formatAgendaTime(suggestedAt)
         recurrence = RECURRENCE_NONE
@@ -205,7 +208,7 @@ fun AgendaScreen() {
     fun openEditReminder(item: AgendaItem) {
         editingItem = item
         title = item.title
-        amountText = item.amount?.toString()?.replace('.', ',') ?: ""
+        note = item.note
         dateText = formatAgendaDate(item.dueAt)
         timeText = formatAgendaTime(item.dueAt)
         recurrence = item.recurrence
@@ -267,7 +270,7 @@ fun AgendaScreen() {
     }.timeInMillis
     val tomorrowStart = todayStart + 24 * 60 * 60 * 1000L
     val activeItems = items.filterNot { it.completed }
-    val completedItems = items.filter { it.completed }.sortedByDescending { it.dueAt }
+    val completedItems = items.filter { it.completed }.sortedByDescending { it.completedAt ?: it.dueAt }
     val overdueItems = activeItems.filter { it.dueAt < now }
     val todayItems = activeItems.filter { it.dueAt in todayStart until tomorrowStart }
     val upcomingItems = activeItems.filter { it.dueAt >= tomorrowStart }
@@ -298,8 +301,6 @@ fun AgendaScreen() {
 
     if (showEditorDialog) {
         val parsedDateTime = parseAgendaDateTime(dateText, timeText)
-        val parsedAmount = parseBrazilianAmount(amountText).takeIf { amountText.isNotBlank() }
-        val invalidAmount = amountText.isNotBlank() && parsedAmount == null
         val currentEditingItem = editingItem
 
         AlertDialog(
@@ -316,25 +317,19 @@ fun AgendaScreen() {
                         value = title,
                         onValueChange = { title = it },
                         label = { Text("Título") },
-                        placeholder = { Text("Ex.: Pagar cartão") },
+                        placeholder = { Text("Ex.: Ligar para a Márcia") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = amountText,
-                        onValueChange = { amountText = it },
-                        label = { Text("Valor opcional") },
-                        placeholder = { Text("Ex.: 250,00") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        value = note,
+                        onValueChange = { note = it },
+                        label = { Text("Observação (opcional)") },
+                        placeholder = { Text("Ex.: confirmar o compromisso antes do horário") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 4
                     )
-                    if (invalidAmount) {
-                        Text(
-                            "Digite um valor válido, por exemplo 250,00.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
 
                     Text("Quando", style = MaterialTheme.typography.labelLarge)
                     Row(
@@ -408,14 +403,14 @@ fun AgendaScreen() {
                             AgendaItem(
                                 id = System.currentTimeMillis(),
                                 title = title.trim(),
-                                amount = parsedAmount,
+                                note = note.trim(),
                                 dueAt = dueAt,
                                 recurrence = recurrence
                             )
                         } else {
                             currentEditingItem.copy(
                                 title = title.trim(),
-                                amount = parsedAmount,
+                                note = note.trim(),
                                 dueAt = dueAt,
                                 recurrence = recurrence
                             )
@@ -435,8 +430,7 @@ fun AgendaScreen() {
                     },
                     enabled = title.isNotBlank() &&
                         parsedDateTime != null &&
-                        parsedDateTime > System.currentTimeMillis() &&
-                        !invalidAmount
+                        parsedDateTime > System.currentTimeMillis()
                 ) {
                     Text(if (currentEditingItem == null) "Salvar" else "Salvar alterações")
                 }
@@ -456,7 +450,7 @@ fun AgendaScreen() {
     ) {
         Text("Agenda", style = MaterialTheme.typography.headlineMedium)
         Text(
-            "Organize compromissos e lembretes financeiros.",
+            "Organize compromissos e lembretes do dia a dia.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -472,12 +466,12 @@ fun AgendaScreen() {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    "Planejamento financeiro",
+                    "Organização",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    "Crie lembretes únicos, semanais ou mensais para contas, vencimentos e compromissos.",
+                    "Crie lembretes únicos, semanais ou mensais com uma observação opcional.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -518,7 +512,7 @@ fun AgendaScreen() {
         if (activeItems.isEmpty()) {
             AgendaEmptyCard(
                 title = "Nada agendado",
-                description = "Crie seu primeiro lembrete financeiro para testar a Agenda no dia a dia."
+                description = "Crie seu primeiro lembrete para organizar a Agenda do dia a dia."
             )
         } else {
             activeItems.forEach { item ->
@@ -543,6 +537,13 @@ fun AgendaScreen() {
                             color = if (isOverdue) MaterialTheme.colorScheme.error
                             else MaterialTheme.colorScheme.primary
                         )
+                        if (item.note.isNotBlank()) {
+                            Text(
+                                item.note,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         when (item.recurrence) {
                             RECURRENCE_WEEKLY -> Text(
                                 "Repete toda semana",
@@ -553,13 +554,6 @@ fun AgendaScreen() {
                                 "Repete todo mês",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        item.amount?.let {
-                            Text(
-                                formatCurrency(it),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                         Row(
@@ -578,7 +572,10 @@ fun AgendaScreen() {
                         Button(
                             onClick = {
                                 cancelAgendaReminder(context, item)
-                                val completed = item.copy(completed = true)
+                                val completed = item.copy(
+                                    completed = true,
+                                    completedAt = System.currentTimeMillis()
+                                )
                                 val updatedItems = items.map {
                                     if (it.id == item.id) completed else it
                                 }.toMutableList()
@@ -593,7 +590,8 @@ fun AgendaScreen() {
                                     val nextItem = item.copy(
                                         id = System.currentTimeMillis(),
                                         dueAt = dueAt,
-                                        completed = false
+                                        completed = false,
+                                        completedAt = null
                                     )
                                     updatedItems.add(nextItem)
                                     scheduleAgendaReminder(context, nextItem)
@@ -609,7 +607,7 @@ fun AgendaScreen() {
                                 when (item.recurrence) {
                                     RECURRENCE_WEEKLY -> "Concluir e criar próxima semana"
                                     RECURRENCE_MONTHLY -> "Concluir e criar próximo mês"
-                                    else -> "Marcar como concluído"
+                                    else -> "Concluir"
                                 }
                             )
                         }
@@ -633,10 +631,17 @@ fun AgendaScreen() {
                     ) {
                         Text(item.title, style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Concluído • ${formatAgendaDateTime(item.dueAt)}",
+                            "Concluído • ${formatAgendaDateTime(item.completedAt ?: item.dueAt)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        if (item.note.isNotBlank()) {
+                            Text(
+                                item.note,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         when (item.recurrence) {
                             RECURRENCE_WEEKLY -> Text(
                                 "Recorrência semanal mantida no próximo lembrete",
@@ -649,31 +654,10 @@ fun AgendaScreen() {
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
-                        item.amount?.let {
-                            Text(formatCurrency(it), style = MaterialTheme.typography.titleSmall)
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            if (item.recurrence == RECURRENCE_NONE) {
-                                OutlinedButton(
-                                    onClick = {
-                                        val reopened = item.copy(completed = false)
-                                        val updated = items.map { if (it.id == item.id) reopened else it }
-                                        saveAgendaItems(context, updated)
-                                        scheduleAgendaReminder(context, reopened)
-                                        items = updated
-                                    },
-                                    enabled = item.dueAt > System.currentTimeMillis(),
-                                    modifier = Modifier.weight(1f)
-                                ) { Text("Reabrir") }
-                            }
-                            OutlinedButton(
-                                onClick = { deletingItem = item },
-                                modifier = Modifier.weight(1f)
-                            ) { Text("Excluir", color = MaterialTheme.colorScheme.error) }
-                        }
+                        OutlinedButton(
+                            onClick = { deletingItem = item },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Excluir", color = MaterialTheme.colorScheme.error) }
                     }
                 }
             }
@@ -690,7 +674,7 @@ fun AgendaScreen() {
             ) {
                 Text("Teste operacional", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Crie um lembrete para alguns minutos à frente, feche o app e confirme se a notificação aparece no horário definido.",
+                    "Crie um lembrete para alguns minutos à frente, feche o app e confirme se a notificação aparece perto do horário definido.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
