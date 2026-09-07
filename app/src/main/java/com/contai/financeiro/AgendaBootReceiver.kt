@@ -34,18 +34,15 @@ class AgendaBootReceiver : BroadcastReceiver() {
             val completed = item.optBoolean("completed", false)
             val dueAt = item.optLong("dueAt", 0L)
             val itemId = item.optLong("id", 0L)
-            val title = item.optString("title", "Lembrete financeiro")
+            val title = item.optString("title", "Lembrete")
+            val note = item.optString("note", item.optString("observation", ""))
 
             if (completed || dueAt <= now || itemId == 0L) continue
 
             val reminderIntent = Intent(context, AgendaReminderReceiver::class.java)
                 .putExtra("itemId", itemId)
                 .putExtra("title", title)
-                .apply {
-                    if (item.has("amount")) {
-                        putExtra("amount", item.optDouble("amount", 0.0))
-                    }
-                }
+                .putExtra("note", note)
 
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
