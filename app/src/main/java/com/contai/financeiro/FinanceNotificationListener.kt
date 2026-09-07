@@ -70,6 +70,7 @@ class FinanceNotificationListener : NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
         saveLifecycleEvent("onCreate")
+        CaptureWatchdog.schedule(this)
     }
 
     override fun onListenerConnected() {
@@ -77,6 +78,7 @@ class FinanceNotificationListener : NotificationListenerService() {
 
         saveLifecycleEvent("onListenerConnected")
         startHeartbeat()
+        CaptureWatchdog.schedule(this)
 
         prefs().edit()
             .putBoolean("service_connected", true)
@@ -103,6 +105,7 @@ class FinanceNotificationListener : NotificationListenerService() {
         NotificationListenerService.requestRebind(
             ComponentName(this, FinanceNotificationListener::class.java)
         )
+        CaptureWatchdog.schedule(this)
     }
 
     override fun onDestroy() {
@@ -113,6 +116,7 @@ class FinanceNotificationListener : NotificationListenerService() {
             .putBoolean("service_connected", false)
             .apply()
 
+        CaptureWatchdog.schedule(this)
         super.onDestroy()
     }
 
@@ -214,7 +218,13 @@ class FinanceNotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
-        val notification = sbn?.notification ?: return
+        val posted = sbn ?: return
+
+        // As notificações do próprio Contai (por exemplo, Agenda) nunca devem
+        // virar transações ou pendências financeiras.
+        if (posted.packageName == packageName) return
+
+        val notification = posted.notification ?: return
         val extras = notification.extras
 
         val title = listOf(
@@ -240,26 +250,26 @@ class FinanceNotificationListener : NotificationListenerService() {
             .putBoolean("service_connected", true)
             .putLong("listener_last_alive_at", System.currentTimeMillis())
             .putLong("debug_last_event_at", System.currentTimeMillis())
-            .putString("debug_last_package", sbn.packageName.orEmpty())
+            .putString("debug_last_package", posted.packageName.orEmpty())
             .putString("debug_last_title", title)
             .putString("debug_last_text", text)
             .apply()
 
-        val parsed = FinancialParser.parse(sbn.packageName.orEmpty(), title, text)
+        val parsed = FinancialParser.parse(posted.packageName.orEmpty(), title, text)
 
         if (parsed.classification == "NAO_FINANCEIRA") {
             return
         }
 
         saveToHistory(
-            sbn.packageName.orEmpty(),
+            posted.packageName.orEmpty(),
             title,
             text,
             parsed
         )
 
         val editor = prefs().edit()
-            .putString("last_package", sbn.packageName.orEmpty())
+            .putString("last_package", posted.packageName.orEmpty())
             .putString("last_title", title)
             .putString("last_text", text)
             .putString("last_type", parsed.type)
