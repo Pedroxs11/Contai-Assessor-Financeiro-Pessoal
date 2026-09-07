@@ -10,17 +10,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import java.text.NumberFormat
-import java.util.Locale
 
 private const val AGENDA_CHANNEL_ID = "agenda_reminders"
 private const val AGENDA_CHANNEL_NAME = "Lembretes da Agenda"
 
 class AgendaReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val title = intent.getStringExtra("title")?.ifBlank { "Lembrete financeiro" }
-            ?: "Lembrete financeiro"
-        val amount = if (intent.hasExtra("amount")) intent.getDoubleExtra("amount", 0.0) else null
+        val title = intent.getStringExtra("title")?.ifBlank { "Lembrete" }
+            ?: "Lembrete"
+        val note = intent.getStringExtra("note").orEmpty()
         val itemId = intent.getLongExtra("itemId", System.currentTimeMillis())
 
         if (
@@ -37,7 +35,7 @@ class AgendaReminderReceiver : BroadcastReceiver() {
                 AGENDA_CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Avisos de contas, vencimentos e compromissos financeiros"
+                description = "Avisos e lembretes da Agenda do Contai"
             }
             notificationManager.createNotificationChannel(channel)
         }
@@ -50,11 +48,7 @@ class AgendaReminderReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val formattedAmount = amount?.let {
-            NumberFormat.getCurrencyInstance(Locale("pt", "BR")).format(it)
-        }
-        val body = formattedAmount?.let { "Compromisso financeiro • $it" }
-            ?: "Você tem um compromisso financeiro agendado."
+        val body = note.ifBlank { "Você tem um lembrete agendado." }
 
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(context, AGENDA_CHANNEL_ID)
@@ -67,6 +61,7 @@ class AgendaReminderReceiver : BroadcastReceiver() {
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(body)
+            .setStyle(Notification.BigTextStyle().bigText(body))
             .setContentIntent(openAppPendingIntent)
             .setAutoCancel(true)
             .build()
