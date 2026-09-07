@@ -20,6 +20,7 @@ class AgendaBootReceiver : BroadcastReceiver() {
 
         restoreAgendaReminders(context)
         requestNotificationListenerRebind(context)
+        CaptureWatchdog.schedule(context)
     }
 
     private fun restoreAgendaReminders(context: Context) {
