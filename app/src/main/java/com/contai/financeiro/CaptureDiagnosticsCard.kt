@@ -3,6 +3,10 @@ package com.contai.financeiro
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import androidx.compose.foundation.layout.Arrangement
@@ -123,20 +127,59 @@ fun CaptureDiagnosticsCard() {
                             .split(':')
                             .any { it == listenerComponent.flattenToString() }
 
-                        if (listenerEnabled) {
-                            prefs.edit()
-                                .putString("listener_lifecycle_event", "manualRebindRequested")
-                                .putLong("listener_lifecycle_at", System.currentTimeMillis())
-                                .apply()
-                            NotificationListenerService.requestRebind(listenerComponent)
-                            recoveryFeedback = "Tentativa de reativação enviada ao Android."
-                        } else {
+                        if (!listenerEnabled) {
                             recoveryFeedback = "Ative primeiro o acesso às notificações do Contai."
+                            return@OutlinedButton
                         }
+
+                        val requestAt = System.currentTimeMillis()
+                        prefs.edit()
+                            .putString("listener_lifecycle_event", "manualRecoveryCycleRequested")
+                            .putLong("listener_lifecycle_at", requestAt)
+                            .apply()
+                        recoveryFeedback = "Reiniciando a captura..."
+
+                        val handler = Handler(Looper.getMainLooper())
+
+                        if (Build.VERSION.SDK_INT >= 34) {
+                            NotificationListenerService.requestUnbind(listenerComponent)
+                            handler.postDelayed({
+                                NotificationListenerService.requestRebind(listenerComponent)
+                            }, 700L)
+                        } else {
+                            val packageManager = context.packageManager
+                            packageManager.setComponentEnabledSetting(
+                                listenerComponent,
+                                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                                PackageManager.DONT_KILL_APP
+                            )
+                            handler.postDelayed({
+                                packageManager.setComponentEnabledSetting(
+                                    listenerComponent,
+                                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                                    PackageManager.DONT_KILL_APP
+                                )
+                                NotificationListenerService.requestRebind(listenerComponent)
+                            }, 700L)
+                        }
+
+                        handler.postDelayed({
+                            val refreshedAliveAt = prefs.getLong("listener_last_alive_at", 0L)
+                            val refreshedConnected = prefs.getBoolean("service_connected", false)
+                            val recovered = refreshedConnected &&
+                                refreshedAliveAt >= requestAt &&
+                                System.currentTimeMillis() - refreshedAliveAt <= 45_000L
+
+                            recoveryFeedback = if (recovered) {
+                                "Captura reativada."
+                            } else {
+                                "O Android não reativou a captura. Abra o acesso às notificações e desligue/ligue o Contai."
+                            }
+                        }, 5_000L)
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Tentar reativar captura")
+                    Text("Reiniciar captura")
                 }
             }
 
