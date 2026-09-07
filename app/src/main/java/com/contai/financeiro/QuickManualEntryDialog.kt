@@ -40,6 +40,23 @@ fun QuickManualEntryDialog(
     var amountText by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Outros") }
     var description by remember { mutableStateOf("") }
+    var newCategoryName by remember { mutableStateOf("") }
+    var customIncomeCategories by remember {
+        mutableStateOf(
+            prefs.getStringSet("custom_income_categories", emptySet())
+                ?.toList()
+                ?.sorted()
+                .orEmpty()
+        )
+    }
+    var customExpenseCategories by remember {
+        mutableStateOf(
+            prefs.getStringSet("custom_expense_categories", emptySet())
+                ?.toList()
+                ?.sorted()
+                .orEmpty()
+        )
+    }
 
     val normalizedAmount = amountText
         .trim()
@@ -49,25 +66,30 @@ fun QuickManualEntryDialog(
         .replace(",", ".")
     val amount = normalizedAmount.toDoubleOrNull()
 
-    val customIncomeCategories = remember {
-        prefs.getStringSet("custom_income_categories", emptySet())
-            ?.toList()
-            ?.sorted()
-            .orEmpty()
-    }
-    val customExpenseCategories = remember {
-        prefs.getStringSet("custom_expense_categories", emptySet())
-            ?.toList()
-            ?.sorted()
-            .orEmpty()
-    }
-
     val categories = if (type == "ENTRADA") {
         (listOf("Receitas", "Salário", "Pix recebido", "Outros") + customIncomeCategories)
             .distinct()
     } else {
         (listOf("Alimentação", "Transporte", "Combustível", "Moradia", "Saúde", "Compras", "Lazer", "Outros") + customExpenseCategories)
             .distinct()
+    }
+
+    fun addCustomCategory() {
+        val cleanName = newCategoryName.trim()
+        if (cleanName.isBlank()) return
+
+        if (type == "ENTRADA") {
+            val updated = (customIncomeCategories + cleanName).distinct().sorted()
+            prefs.edit().putStringSet("custom_income_categories", updated.toSet()).apply()
+            customIncomeCategories = updated
+        } else {
+            val updated = (customExpenseCategories + cleanName).distinct().sorted()
+            prefs.edit().putStringSet("custom_expense_categories", updated.toSet()).apply()
+            customExpenseCategories = updated
+        }
+
+        category = cleanName
+        newCategoryName = ""
     }
 
     AlertDialog(
@@ -116,6 +138,24 @@ fun QuickManualEntryDialog(
                         onClick = { category = item },
                         label = { Text(item) }
                     )
+                }
+
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = newCategoryName,
+                    onValueChange = { newCategoryName = it },
+                    label = { Text("Nova categoria") },
+                    placeholder = { Text("Ex.: Educação") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = { addCustomCategory() },
+                    enabled = newCategoryName.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Adicionar categoria")
                 }
 
                 Spacer(Modifier.height(12.dp))
