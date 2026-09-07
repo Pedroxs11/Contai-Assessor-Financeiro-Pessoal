@@ -7,6 +7,9 @@ on:
       - dev/v1-1-beta
     paths:
       - '.github/workflows/android-signed-build.yml'
+      - 'app/build.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradle/wrapper/gradle-wrapper.properties'
 
 jobs:
   build-signed:
