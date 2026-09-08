@@ -26,37 +26,112 @@ fun isSameHistoryDay(timestamp: Long, selectedDay: Long): Boolean {
     return first.get(Calendar.YEAR) == second.get(Calendar.YEAR) && first.get(Calendar.DAY_OF_YEAR) == second.get(Calendar.DAY_OF_YEAR)
 }
 
-@Composable fun HistoryDateHeader(label: String) { Spacer(Modifier.height(8.dp)); Text(label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp)) }
+@Composable
+fun HistoryDateHeader(label: String) {
+    Spacer(Modifier.height(8.dp))
+    Text(label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
+}
 
 @Composable
-fun GroupedHistoryTransactions(transactions: List<TransactionRecord>, onConfirm: (Long) -> Unit, onCorrect: (TransactionRecord) -> Unit, onIgnore: (Long) -> Unit, onDelete: (TransactionRecord) -> Unit, showDateGroups: Boolean = true) {
+fun GroupedHistoryTransactions(
+    transactions: List<TransactionRecord>,
+    onConfirm: (Long) -> Unit,
+    onCorrect: (TransactionRecord) -> Unit,
+    onIgnore: (Long) -> Unit,
+    onDelete: (TransactionRecord) -> Unit,
+    showDateGroups: Boolean = true
+) {
+    var selectedDay by remember { mutableStateOf<Long?>(null) }
+    val visibleTransactions = if (showDateGroups) filterTransactionsByDay(transactions, selectedDay) else transactions
+
+    if (showDateGroups) {
+        HistoryDayFilter(
+            selectedDay = selectedDay,
+            onDaySelected = { selectedDay = it },
+            onClear = { selectedDay = null }
+        )
+        Spacer(Modifier.height(8.dp))
+    }
+
+    if (visibleTransactions.isEmpty() && selectedDay != null) {
+        Text(
+            "Nenhum lançamento nessa data.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(vertical = 16.dp)
+        )
+        return
+    }
+
     var previousGroup: String? = null
-    transactions.sortedByDescending { it.effectiveMovementTimestamp }.forEach { transaction ->
+    visibleTransactions.sortedByDescending { it.effectiveMovementTimestamp }.forEach { transaction ->
         val group = historyDateGroup(transaction.effectiveMovementTimestamp)
-        if (showDateGroups && group != previousGroup) { HistoryDateHeader(group); previousGroup = group }
+        if (showDateGroups && group != previousGroup) {
+            HistoryDateHeader(group)
+            previousGroup = group
+        }
         TransactionHistoryCard(transaction, onConfirm, onCorrect, onIgnore, onDelete)
     }
 }
 
 @Composable
-fun TransactionHistoryCard(transaction: TransactionRecord, onConfirm: (Long) -> Unit, onCorrect: (TransactionRecord) -> Unit, onIgnore: (Long) -> Unit, onDelete: (TransactionRecord) -> Unit) {
+fun TransactionHistoryCard(
+    transaction: TransactionRecord,
+    onConfirm: (Long) -> Unit,
+    onCorrect: (TransactionRecord) -> Unit,
+    onIgnore: (Long) -> Unit,
+    onDelete: (TransactionRecord) -> Unit
+) {
     var menuExpanded by remember(transaction.timestamp) { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         val amountText = transaction.amount?.let { formatCurrency(it) } ?: "Valor não identificado"
-        val statusText = when (transaction.status) { "CONFIRMADA" -> "Confirmada"; "POSSIVEL" -> "Aguardando confirmação"; else -> transaction.status.ifBlank { "Não identificado" } }
-        val dateText = if (transaction.effectiveMovementTimestamp > 0L) SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(transaction.effectiveMovementTimestamp)) else "Horário não disponível"
+        val statusText = when (transaction.status) {
+            "CONFIRMADA" -> "Confirmada"
+            "POSSIVEL" -> "Aguardando confirmação"
+            else -> transaction.status.ifBlank { "Não identificado" }
+        }
+        val dateText = if (transaction.effectiveMovementTimestamp > 0L) {
+            SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(transaction.effectiveMovementTimestamp))
+        } else {
+            "Horário não disponível"
+        }
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(transaction.category, style = MaterialTheme.typography.titleMedium)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(amountText, style = MaterialTheme.typography.titleMedium, color = when (transaction.type) { "ENTRADA" -> MaterialTheme.colorScheme.secondary; "DESPESA" -> MaterialTheme.colorScheme.error; else -> MaterialTheme.colorScheme.onSurface })
-                    if (transaction.status == "CONFIRMADA") { IconButton(onClick = { menuExpanded = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }; DropdownMenu(menuExpanded, { menuExpanded = false }) { DropdownMenuItem({ Text("Editar") }, { menuExpanded = false; onCorrect(transaction) }); DropdownMenuItem({ Text("Excluir") }, { menuExpanded = false; onDelete(transaction) }) } }
+                    Text(
+                        amountText,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = when (transaction.type) {
+                            "ENTRADA" -> MaterialTheme.colorScheme.secondary
+                            "DESPESA" -> MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.onSurface
+                        }
+                    )
+                    if (transaction.status == "CONFIRMADA") {
+                        IconButton(onClick = { menuExpanded = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
+                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            DropdownMenuItem(text = { Text("Editar") }, onClick = { menuExpanded = false; onCorrect(transaction) })
+                            DropdownMenuItem(text = { Text("Excluir") }, onClick = { menuExpanded = false; onDelete(transaction) })
+                        }
+                    }
                 }
             }
-            Spacer(Modifier.height(6.dp)); Text(friendlyAppName(transaction.source), style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(8.dp)); Text("${transaction.type} • $statusText", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(6.dp)); Text(dateText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (transaction.status == "POSSIVEL") { Spacer(Modifier.height(12.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button({ onConfirm(transaction.timestamp) }, Modifier.weight(1f)) { Text("Confirmar") }; OutlinedButton({ onCorrect(transaction) }, Modifier.weight(1f)) { Text("Corrigir") } }; Spacer(Modifier.height(8.dp)); TextButton({ onIgnore(transaction.timestamp) }, Modifier.fillMaxWidth()) { Text("Ignorar") } }
+            Spacer(Modifier.height(6.dp))
+            Text(friendlyAppName(transaction.source), style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(8.dp))
+            Text("${transaction.type} • $statusText", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(6.dp))
+            Text(dateText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (transaction.status == "POSSIVEL") {
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button({ onConfirm(transaction.timestamp) }, Modifier.weight(1f)) { Text("Confirmar") }
+                    OutlinedButton({ onCorrect(transaction) }, Modifier.weight(1f)) { Text("Corrigir") }
+                }
+                Spacer(Modifier.height(8.dp))
+                TextButton({ onIgnore(transaction.timestamp) }, Modifier.fillMaxWidth()) { Text("Ignorar") }
+            }
         }
     }
 }
