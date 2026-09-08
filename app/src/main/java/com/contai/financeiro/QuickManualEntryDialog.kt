@@ -10,13 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -24,9 +18,7 @@ import androidx.compose.ui.unit.dp
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
 @Composable
 fun QuickManualEntryDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
@@ -41,8 +33,7 @@ fun QuickManualEntryDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
     var customIncomeCategories by remember { mutableStateOf(prefs.getStringSet("custom_income_categories", emptySet())?.toList()?.sorted().orEmpty()) }
     var customExpenseCategories by remember { mutableStateOf(prefs.getStringSet("custom_expense_categories", emptySet())?.toList()?.sorted().orEmpty()) }
 
-    val normalizedAmount = amountText.trim().replace("R$", "", true).replace(" ", "").replace(".", "").replace(",", ".")
-    val amount = normalizedAmount.toDoubleOrNull()
+    val amount = amountText.trim().replace("R$", "", true).replace(" ", "").replace(".", "").replace(",", ".").toDoubleOrNull()
     val categories = if (type == "ENTRADA") (listOf("Receitas", "Salário", "Pix recebido", "Outros") + customIncomeCategories).distinct() else (listOf("Alimentação", "Transporte", "Combustível", "Moradia", "Saúde", "Compras", "Lazer", "Outros") + customExpenseCategories).distinct()
 
     fun addCustomCategory() {
@@ -55,9 +46,9 @@ fun QuickManualEntryDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
     fun openDatePicker() {
         val selected = Calendar.getInstance().apply { timeInMillis = movementTimestamp }
         DatePickerDialog(context, { _, year, month, day ->
-            val current = Calendar.getInstance().apply { timeInMillis = movementTimestamp }
-            current.set(Calendar.YEAR, year); current.set(Calendar.MONTH, month); current.set(Calendar.DAY_OF_MONTH, day)
-            movementTimestamp = current.timeInMillis
+            val chosen = Calendar.getInstance().apply { timeInMillis = movementTimestamp }
+            chosen.set(year, month, day)
+            movementTimestamp = chosen.timeInMillis
         }, selected.get(Calendar.YEAR), selected.get(Calendar.MONTH), selected.get(Calendar.DAY_OF_MONTH)).show()
     }
 
@@ -68,27 +59,32 @@ fun QuickManualEntryDialog(onDismiss: () -> Unit, onSaved: () -> Unit) {
                 FilterChip(type == "ENTRADA", { type = "ENTRADA"; category = "Receitas" }, label = { Text("Entrada") })
                 FilterChip(type == "DESPESA", { type = "DESPESA"; category = "Outros" }, label = { Text("Despesa") })
             }
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(amountText, { amountText = it }, label = { Text("Valor") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(description, { description = it }, label = { Text("Estabelecimento/descrição (opcional)") }, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(12.dp)); OutlinedTextField(amountText, { amountText = it }, label = { Text("Valor") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            Spacer(Modifier.height(12.dp)); OutlinedTextField(description, { description = it }, label = { Text("Estabelecimento/descrição (opcional)") }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(12.dp)); Text("Categoria")
             categories.forEach { item -> FilterChip(category == item, { category = item }, label = { Text(item) }) }
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(newCategoryName, { newCategoryName = it }, label = { Text("Nova categoria") }, placeholder = { Text("Ex.: Educação") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            Spacer(Modifier.height(12.dp)); OutlinedTextField(newCategoryName, { newCategoryName = it }, label = { Text("Nova categoria") }, placeholder = { Text("Ex.: Educação") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             Spacer(Modifier.height(8.dp)); Button({ addCustomCategory() }, enabled = newCategoryName.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Adicionar categoria") }
-            Spacer(Modifier.height(12.dp)); Text("Data da movimentação")
-            Spacer(Modifier.height(6.dp))
-            OutlinedButton(onClick = { openDatePicker() }, modifier = Modifier.fillMaxWidth()) {
-                Text(SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR")).format(Date(movementTimestamp)))
-            }
+            Spacer(Modifier.height(12.dp)); Text("Data da movimentação"); Spacer(Modifier.height(6.dp))
+            OutlinedButton({ openDatePicker() }, modifier = Modifier.fillMaxWidth()) { Text(SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR")).format(Date(movementTimestamp))) }
         }
     }, confirmButton = {
         Button(enabled = amount != null && amount > 0.0, onClick = {
             val validAmount = amount ?: return@Button
             val createdAt = System.currentTimeMillis()
             val history = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
-            history.put(JSONObject().put("timestamp", createdAt).put("movementTimestamp", movementTimestamp).put("package", "MANUAL").put("title", description.ifBlank { "Lançamento manual" }).put("text", description).put("type", type).put("category", category).put("confidence", 100).put("classification", "CONFIRMADA").put("amount", validAmount))
+            history.put(JSONObject()
+                .put("timestamp", movementTimestamp)
+                .put("movementTimestamp", movementTimestamp)
+                .put("createdTimestamp", createdAt)
+                .put("package", "MANUAL")
+                .put("title", description.ifBlank { "Lançamento manual" })
+                .put("text", description)
+                .put("type", type)
+                .put("category", category)
+                .put("confidence", 100)
+                .put("classification", "CONFIRMADA")
+                .put("amount", validAmount))
             prefs.edit().putString("transaction_history", history.toString()).apply(); onSaved()
         }) { Text("Salvar") }
     }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
