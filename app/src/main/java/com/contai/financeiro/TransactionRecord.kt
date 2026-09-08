@@ -10,5 +10,9 @@ data class TransactionRecord(
     val title: String,
     val text: String,
     val confidence: Int,
-    val investmentType: String = ""
-)
+    val investmentType: String = "",
+    val movementTimestamp: Long = timestamp
+) {
+    val effectiveMovementTimestamp: Long
+        get() = movementTimestamp.takeIf { it > 0L } ?: timestamp
+}
