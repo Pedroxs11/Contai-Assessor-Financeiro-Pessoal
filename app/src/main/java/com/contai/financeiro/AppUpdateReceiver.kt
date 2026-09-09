@@ -10,12 +10,16 @@ class AppUpdateReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            context.getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
+                .edit()
+                .putString("listener_lifecycle_event", "rebindRequestedAfterUpdate")
+                .putLong("listener_lifecycle_at", System.currentTimeMillis())
+                .apply()
+
             NotificationListenerService.requestRebind(
-                ComponentName(
-                    context,
-                    FinanceNotificationListener::class.java
-                )
+                ComponentName(context, FinanceNotificationListener::class.java)
             )
+            CaptureWatchdog.schedule(context)
         }
     }
 }
