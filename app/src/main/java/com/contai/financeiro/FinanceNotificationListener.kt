@@ -16,272 +16,96 @@ class FinanceNotificationListener : NotificationListenerService() {
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
             val now = System.currentTimeMillis()
-            val binderResponding = runCatching {
-                activeNotifications != null
-            }.getOrDefault(false)
-
+            val binderResponding = runCatching { activeNotifications != null }.getOrDefault(false)
             val editor = prefs().edit()
                 .putBoolean("service_connected", binderResponding)
                 .putLong("listener_probe_at", now)
-                .putString(
-                    "listener_probe_status",
-                    if (binderResponding) "BOUND" else "UNBOUND"
-                )
-
-            if (binderResponding) {
-                editor.putLong("listener_last_alive_at", now)
-            }
-
+                .putString("listener_probe_status", if (binderResponding) "BOUND" else "UNBOUND")
+            if (binderResponding) editor.putLong("listener_last_alive_at", now)
             editor.apply()
 
             if (!binderResponding) {
                 saveLifecycleEvent("heartbeatDetectedUnbound")
-                NotificationListenerService.requestRebind(
-                    ComponentName(
-                        this@FinanceNotificationListener,
-                        FinanceNotificationListener::class.java
-                    )
-                )
+                NotificationListenerService.requestRebind(ComponentName(this@FinanceNotificationListener, FinanceNotificationListener::class.java))
             }
-
             heartbeatHandler.postDelayed(this, 15_000)
         }
     }
 
-    private fun startHeartbeat() {
-        heartbeatHandler.removeCallbacks(heartbeatRunnable)
-        heartbeatHandler.post(heartbeatRunnable)
-    }
-
-    private fun stopHeartbeat() {
-        heartbeatHandler.removeCallbacks(heartbeatRunnable)
-    }
-
-    private fun prefs() =
-        getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
+    private fun startHeartbeat() { heartbeatHandler.removeCallbacks(heartbeatRunnable); heartbeatHandler.post(heartbeatRunnable) }
+    private fun stopHeartbeat() { heartbeatHandler.removeCallbacks(heartbeatRunnable) }
+    private fun prefs() = getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
 
     private fun saveLifecycleEvent(event: String) {
-        prefs().edit()
-            .putString("listener_lifecycle_event", event)
-            .putLong("listener_lifecycle_at", System.currentTimeMillis())
-            .apply()
+        prefs().edit().putString("listener_lifecycle_event", event).putLong("listener_lifecycle_at", System.currentTimeMillis()).apply()
     }
 
-    override fun onCreate() {
-        super.onCreate()
-        saveLifecycleEvent("onCreate")
-        CaptureWatchdog.schedule(this)
-    }
+    override fun onCreate() { super.onCreate(); saveLifecycleEvent("onCreate"); CaptureWatchdog.schedule(this) }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
-
         saveLifecycleEvent("onListenerConnected")
-        startHeartbeat()
-        CaptureWatchdog.schedule(this)
-
-        prefs().edit()
-            .putBoolean("service_connected", true)
-            .putLong("listener_last_alive_at", System.currentTimeMillis())
-            .putString("last_package", "SISTEMA CONTAI")
-            .putString("last_title", "Serviço conectado")
-            .putString(
-                "last_text",
-                "O Android conectou o Contai ao serviço de notificações."
-            )
-            .apply()
+        startHeartbeat(); CaptureWatchdog.schedule(this)
+        prefs().edit().putBoolean("service_connected", true).putLong("listener_last_alive_at", System.currentTimeMillis())
+            .putString("last_package", "SISTEMA CONTAI").putString("last_title", "Serviço conectado")
+            .putString("last_text", "O Android conectou o Contai ao serviço de notificações.").apply()
     }
 
     override fun onListenerDisconnected() {
-        super.onListenerDisconnected()
-
-        saveLifecycleEvent("onListenerDisconnected")
-        stopHeartbeat()
-
-        prefs().edit()
-            .putBoolean("service_connected", false)
-            .apply()
-
-        NotificationListenerService.requestRebind(
-            ComponentName(this, FinanceNotificationListener::class.java)
-        )
-        CaptureWatchdog.schedule(this)
+        super.onListenerDisconnected(); saveLifecycleEvent("onListenerDisconnected"); stopHeartbeat()
+        prefs().edit().putBoolean("service_connected", false).apply()
+        NotificationListenerService.requestRebind(ComponentName(this, FinanceNotificationListener::class.java)); CaptureWatchdog.schedule(this)
     }
 
     override fun onDestroy() {
-        saveLifecycleEvent("onDestroy")
-        stopHeartbeat()
-
-        prefs().edit()
-            .putBoolean("service_connected", false)
-            .apply()
-
-        CaptureWatchdog.schedule(this)
-        super.onDestroy()
+        saveLifecycleEvent("onDestroy"); stopHeartbeat(); prefs().edit().putBoolean("service_connected", false).apply(); CaptureWatchdog.schedule(this); super.onDestroy()
     }
 
-    private fun saveToHistory(
-        packageName: String,
-        title: String,
-        text: String,
-        parsed: ParsedTransaction
-    ) {
+    private fun saveToHistory(packageName: String, title: String, text: String, parsed: ParsedTransaction): Boolean {
         val prefs = prefs()
-        val history = JSONArray(
-            prefs.getString("transaction_history", "[]") ?: "[]"
-        )
-
+        val history = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
         if (history.length() > 0) {
             val lastItem = history.getJSONObject(history.length() - 1)
             val lastTimestamp = lastItem.optLong("timestamp", 0L)
             val now = System.currentTimeMillis()
-
-            val samePackage = lastItem.optString("package") == packageName
-            val sameTitle = lastItem.optString("title") == title
-            val sameText = lastItem.optString("text") == text
-            val sameType = lastItem.optString("type") == parsed.type
-
-            val lastAmount = if (lastItem.has("amount")) {
-                lastItem.optDouble("amount")
-            } else {
-                null
-            }
-
-            val sameAmount = lastAmount == parsed.amount
-            val within30Seconds = now - lastTimestamp <= 30_000
-
-            if (
-                samePackage &&
-                sameTitle &&
-                sameText &&
-                sameType &&
-                sameAmount &&
-                within30Seconds
-            ) {
-                return
-            }
+            val lastAmount = if (lastItem.has("amount")) lastItem.optDouble("amount") else null
+            if (lastItem.optString("package") == packageName && lastItem.optString("title") == title && lastItem.optString("text") == text && lastItem.optString("type") == parsed.type && lastAmount == parsed.amount && now - lastTimestamp <= 30_000) return false
         }
 
-        val normalizedLearningText =
-            text
-                .lowercase()
-                .replace(
-                    Regex("""r\$\s*[0-9.]+,[0-9]{2}"""),
-                    "r$ valor"
-                )
-                .replace(Regex("""\s+"""), " ")
-                .trim()
-
-        val learningKey =
-            "$packageName|$title|$normalizedLearningText"
-                .lowercase()
-                .trim()
-
-        val learned = prefs.getString(
-            "learned_$learningKey",
-            null
-        )
-
-        val learnedParts = learned?.split("|", limit = 2)
-
-        val finalType =
-            learnedParts?.getOrNull(0) ?: parsed.type
-
-        val category =
-            learnedParts?.getOrNull(1)
-                ?: when (finalType) {
-                    "ENTRADA" -> "Receitas"
-                    "DESPESA" -> "Outros"
-                    else -> "Não categorizado"
-                }
-
-        val item = JSONObject()
-            .put("timestamp", System.currentTimeMillis())
-            .put("package", packageName)
-            .put("title", title)
-            .put("text", text)
-            .put("type", finalType)
-            .put("category", category)
-            .put("confidence", parsed.confidence)
-            .put("classification", parsed.classification)
-            .put("investmentType", parsed.investmentType)
-
-        if (parsed.amount != null) {
-            item.put("amount", parsed.amount)
-        }
-
+        val normalizedLearningText = text.lowercase().replace(Regex("""r\$\s*[0-9.]+,[0-9]{2}"""), "r$ valor").replace(Regex("""\s+"""), " ").trim()
+        val learningKey = "$packageName|$title|$normalizedLearningText".lowercase().trim()
+        val learnedParts = prefs.getString("learned_$learningKey", null)?.split("|", limit = 2)
+        val finalType = learnedParts?.getOrNull(0) ?: parsed.type
+        val category = learnedParts?.getOrNull(1) ?: when (finalType) { "ENTRADA" -> "Receitas"; "DESPESA" -> "Outros"; else -> "Não categorizado" }
+        val now = System.currentTimeMillis()
+        val item = JSONObject().put("timestamp", now).put("movementTimestamp", now).put("package", packageName).put("title", title).put("text", text)
+            .put("type", finalType).put("category", category).put("confidence", parsed.confidence).put("classification", parsed.classification).put("investmentType", parsed.investmentType)
+        if (parsed.amount != null) item.put("amount", parsed.amount)
         history.put(item)
-
-        prefs.edit()
-            .putString("transaction_history", history.toString())
-            .apply()
+        prefs.edit().putString("transaction_history", history.toString()).putLong("capture_last_saved_at", now).putString("capture_last_saved_package", packageName).apply()
+        return true
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         val posted = sbn ?: return
-
-        // As notificações do próprio Contai (por exemplo, Agenda) nunca devem
-        // virar transações ou pendências financeiras.
         if (posted.packageName == packageName) return
-
         val notification = posted.notification ?: return
         val extras = notification.extras
-
-        val title = listOf(
-            extras.getCharSequence("android.title")?.toString().orEmpty(),
-            extras.getCharSequence("android.title.big")?.toString().orEmpty(),
-            extras.getCharSequence("android.subText")?.toString().orEmpty()
-        ).firstOrNull { it.isNotBlank() }.orEmpty()
-
-        val textLines =
-            extras.getCharSequenceArray("android.textLines")
-                ?.joinToString(" ")
-                .orEmpty()
-
-        val text = listOf(
-            extras.getCharSequence("android.bigText")?.toString().orEmpty(),
-            extras.getCharSequence("android.text")?.toString().orEmpty(),
-            textLines,
-            extras.getCharSequence("android.subText")?.toString().orEmpty(),
-            notification.tickerText?.toString().orEmpty()
-        ).firstOrNull { it.isNotBlank() }.orEmpty()
-
-        prefs().edit()
-            .putBoolean("service_connected", true)
-            .putLong("listener_last_alive_at", System.currentTimeMillis())
-            .putLong("debug_last_event_at", System.currentTimeMillis())
-            .putString("debug_last_package", posted.packageName.orEmpty())
-            .putString("debug_last_title", title)
-            .putString("debug_last_text", text)
-            .apply()
+        val title = listOf(extras.getCharSequence("android.title")?.toString().orEmpty(), extras.getCharSequence("android.title.big")?.toString().orEmpty(), extras.getCharSequence("android.subText")?.toString().orEmpty()).firstOrNull { it.isNotBlank() }.orEmpty()
+        val textLines = extras.getCharSequenceArray("android.textLines")?.joinToString(" ").orEmpty()
+        val text = listOf(extras.getCharSequence("android.bigText")?.toString().orEmpty(), extras.getCharSequence("android.text")?.toString().orEmpty(), textLines, extras.getCharSequence("android.subText")?.toString().orEmpty(), notification.tickerText?.toString().orEmpty()).firstOrNull { it.isNotBlank() }.orEmpty()
+        val now = System.currentTimeMillis()
+        prefs().edit().putBoolean("service_connected", true).putLong("listener_last_alive_at", now).putLong("debug_last_event_at", now)
+            .putString("debug_last_package", posted.packageName.orEmpty()).putString("debug_last_title", title).putString("debug_last_text", text).apply()
 
         val parsed = FinancialParser.parse(posted.packageName.orEmpty(), title, text)
+        prefs().edit().putLong("capture_last_parser_at", System.currentTimeMillis()).putString("capture_last_parser_result", parsed.classification).apply()
+        if (parsed.classification == "NAO_FINANCEIRA") return
 
-        if (parsed.classification == "NAO_FINANCEIRA") {
-            return
-        }
-
-        saveToHistory(
-            posted.packageName.orEmpty(),
-            title,
-            text,
-            parsed
-        )
-
-        val editor = prefs().edit()
-            .putString("last_package", posted.packageName.orEmpty())
-            .putString("last_title", title)
-            .putString("last_text", text)
-            .putString("last_type", parsed.type)
-            .putInt("last_confidence", parsed.confidence)
-            .putString("last_classification", parsed.classification)
-
-        if (parsed.amount != null) {
-            editor.putString("last_amount", parsed.amount.toString())
-        } else {
-            editor.remove("last_amount")
-        }
-
+        saveToHistory(posted.packageName.orEmpty(), title, text, parsed)
+        val editor = prefs().edit().putString("last_package", posted.packageName.orEmpty()).putString("last_title", title).putString("last_text", text)
+            .putString("last_type", parsed.type).putInt("last_confidence", parsed.confidence).putString("last_classification", parsed.classification)
+        if (parsed.amount != null) editor.putString("last_amount", parsed.amount.toString()) else editor.remove("last_amount")
         editor.apply()
     }
 }
