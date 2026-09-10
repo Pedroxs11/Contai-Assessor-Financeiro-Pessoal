@@ -1,6 +1,5 @@
 package com.contai.financeiro
 
-import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.ComponentName
@@ -26,7 +25,6 @@ class AgendaBootReceiver : BroadcastReceiver() {
     private fun restoreAgendaReminders(context: Context) {
         val prefs = context.getSharedPreferences(BOOT_AGENDA_PREFS, Context.MODE_PRIVATE)
         val items = JSONArray(prefs.getString(BOOT_AGENDA_ITEMS_KEY, "[]") ?: "[]")
-        val alarmManager = context.getSystemService(AlarmManager::class.java)
         val now = System.currentTimeMillis()
 
         for (i in 0 until items.length()) {
@@ -51,11 +49,7 @@ class AgendaBootReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            alarmManager.setAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                dueAt,
-                pendingIntent
-            )
+            AgendaAlarmScheduler.schedule(context, dueAt, pendingIntent)
         }
     }
 
