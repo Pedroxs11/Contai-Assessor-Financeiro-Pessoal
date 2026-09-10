@@ -6,13 +6,16 @@ import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 
 private const val WATCHDOG_PREFS = "contai_notifications"
 private const val WATCHDOG_REQUEST_CODE = 7319
-private const val WATCHDOG_INTERVAL_MS = 10 * 60 * 1000L
-private const val WATCHDOG_STALE_AFTER_MS = 2 * 60 * 1000L
+private const val WATCHDOG_INTERVAL_MS = 5 * 60 * 1000L
+private const val WATCHDOG_STALE_AFTER_MS = 90 * 1000L
 
 object CaptureWatchdog {
     fun schedule(context: Context) {
@@ -57,12 +60,19 @@ class CaptureWatchdogReceiver : BroadcastReceiver() {
 
                 if (stale) {
                     prefs.edit()
-                        .putString("listener_lifecycle_event", "watchdogRebindRequested")
+                        .putString("listener_lifecycle_event", "watchdogRecoveryCycleRequested")
                         .putLong("listener_lifecycle_at", now)
                         .putLong("watchdog_last_rebind_at", now)
                         .apply()
 
-                    NotificationListenerService.requestRebind(listenerComponent)
+                    if (Build.VERSION.SDK_INT >= 34) {
+                        NotificationListenerService.requestUnbind(listenerComponent)
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            NotificationListenerService.requestRebind(listenerComponent)
+                        }, 700L)
+                    } else {
+                        NotificationListenerService.requestRebind(listenerComponent)
+                    }
                 } else {
                     prefs.edit()
                         .putLong("watchdog_last_check_at", now)
