@@ -88,6 +88,40 @@ class FinanceNotificationListener : NotificationListenerService() {
         return parts.distinct().joinToString(" • ")
     }
 
+    private fun appendDiagnosticEvent(
+        packageName: String,
+        title: String,
+        text: String,
+        parsed: ParsedTransaction,
+        timestamp: Long
+    ) {
+        val preferences = prefs()
+        val current = runCatching {
+            JSONArray(preferences.getString("capture_recent_events", "[]") ?: "[]")
+        }.getOrElse { JSONArray() }
+
+        val updated = JSONArray()
+        val start = (current.length() - 7).coerceAtLeast(0)
+        for (i in start until current.length()) {
+            current.optJSONObject(i)?.let(updated::put)
+        }
+
+        updated.put(
+            JSONObject()
+                .put("timestamp", timestamp)
+                .put("package", packageName)
+                .put("title", title)
+                .put("text", text)
+                .put("classification", parsed.classification)
+                .put("type", parsed.type)
+                .apply { parsed.amount?.let { put("amount", it) } }
+        )
+
+        preferences.edit()
+            .putString("capture_recent_events", updated.toString())
+            .apply()
+    }
+
     private fun saveToHistory(packageName: String, title: String, text: String, parsed: ParsedTransaction): Boolean {
         val prefs = prefs()
         val history = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
@@ -146,6 +180,14 @@ class FinanceNotificationListener : NotificationListenerService() {
             .putString("capture_last_parser_type", parsed.type)
             .putString("capture_last_parser_description", parsed.description)
             .apply()
+
+        appendDiagnosticEvent(
+            packageName = posted.packageName.orEmpty(),
+            title = title,
+            text = text,
+            parsed = parsed,
+            timestamp = now
+        )
 
         if (parsed.classification == "NAO_FINANCEIRA") return
 
