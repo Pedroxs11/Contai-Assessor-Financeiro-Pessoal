@@ -660,6 +660,8 @@ fun AgendaScreen() {
             }
         }
 
+        AgendaDeliveryDiagnosticsCard()
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
