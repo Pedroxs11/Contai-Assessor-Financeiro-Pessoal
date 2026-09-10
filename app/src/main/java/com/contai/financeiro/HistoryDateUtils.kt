@@ -40,7 +40,7 @@ fun GroupedHistoryTransactions(
     onIgnore: (Long) -> Unit,
     onDelete: (TransactionRecord) -> Unit,
     showDateGroups: Boolean = true,
-    showActions: Boolean = true
+    showActions: Boolean = transactions.any { it.status == "POSSIVEL" }
 ) {
     var selectedDay by remember { mutableStateOf<Long?>(null) }
     val visibleTransactions = if (showDateGroups) filterTransactionsByDay(transactions, selectedDay) else transactions
