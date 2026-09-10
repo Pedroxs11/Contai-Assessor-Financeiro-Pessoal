@@ -1,7 +1,8 @@
 package com.contai.financeiro
 
-import android.content.Context
 import android.content.ComponentName
+import android.content.Context
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.service.notification.NotificationListenerService
@@ -61,6 +62,32 @@ class FinanceNotificationListener : NotificationListenerService() {
         saveLifecycleEvent("onDestroy"); stopHeartbeat(); prefs().edit().putBoolean("service_connected", false).apply(); CaptureWatchdog.schedule(this); super.onDestroy()
     }
 
+    private fun bundleText(extras: Bundle): String {
+        val parts = mutableListOf<String>()
+        val keys = listOf(
+            "android.title", "android.title.big", "android.text", "android.bigText",
+            "android.subText", "android.summaryText", "android.infoText"
+        )
+        keys.forEach { key ->
+            extras.getCharSequence(key)?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let(parts::add)
+        }
+        extras.getCharSequenceArray("android.textLines")
+            ?.map { it.toString().trim() }
+            ?.filter { it.isNotBlank() }
+            ?.let(parts::addAll)
+
+        @Suppress("DEPRECATION")
+        val messages = extras.getParcelableArray("android.messages")
+        messages?.forEach { raw ->
+            runCatching {
+                val bundle = raw as? Bundle ?: return@runCatching
+                bundle.getCharSequence("text")?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let(parts::add)
+                bundle.getCharSequence("sender")?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let(parts::add)
+            }
+        }
+        return parts.distinct().joinToString(" • ")
+    }
+
     private fun saveToHistory(packageName: String, title: String, text: String, parsed: ParsedTransaction): Boolean {
         val prefs = prefs()
         val history = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
@@ -91,15 +118,35 @@ class FinanceNotificationListener : NotificationListenerService() {
         if (posted.packageName == packageName) return
         val notification = posted.notification ?: return
         val extras = notification.extras
-        val title = listOf(extras.getCharSequence("android.title")?.toString().orEmpty(), extras.getCharSequence("android.title.big")?.toString().orEmpty(), extras.getCharSequence("android.subText")?.toString().orEmpty()).firstOrNull { it.isNotBlank() }.orEmpty()
-        val textLines = extras.getCharSequenceArray("android.textLines")?.joinToString(" ").orEmpty()
-        val text = listOf(extras.getCharSequence("android.bigText")?.toString().orEmpty(), extras.getCharSequence("android.text")?.toString().orEmpty(), textLines, extras.getCharSequence("android.subText")?.toString().orEmpty(), notification.tickerText?.toString().orEmpty()).firstOrNull { it.isNotBlank() }.orEmpty()
+        val title = listOf(
+            extras.getCharSequence("android.title")?.toString().orEmpty(),
+            extras.getCharSequence("android.title.big")?.toString().orEmpty(),
+            extras.getCharSequence("android.subText")?.toString().orEmpty()
+        ).firstOrNull { it.isNotBlank() }.orEmpty()
+
+        val richText = bundleText(extras)
+        val ticker = notification.tickerText?.toString().orEmpty()
+        val text = listOf(richText, ticker).filter { it.isNotBlank() }.distinct().joinToString(" • ")
         val now = System.currentTimeMillis()
-        prefs().edit().putBoolean("service_connected", true).putLong("listener_last_alive_at", now).putLong("debug_last_event_at", now)
-            .putString("debug_last_package", posted.packageName.orEmpty()).putString("debug_last_title", title).putString("debug_last_text", text).apply()
+
+        prefs().edit()
+            .putBoolean("service_connected", true)
+            .putLong("listener_last_alive_at", now)
+            .putLong("debug_last_event_at", now)
+            .putString("debug_last_package", posted.packageName.orEmpty())
+            .putString("debug_last_title", title)
+            .putString("debug_last_text", text)
+            .putString("debug_last_raw", "$title • $text".trim(' ', '•'))
+            .apply()
 
         val parsed = FinancialParser.parse(posted.packageName.orEmpty(), title, text)
-        prefs().edit().putLong("capture_last_parser_at", System.currentTimeMillis()).putString("capture_last_parser_result", parsed.classification).apply()
+        prefs().edit()
+            .putLong("capture_last_parser_at", System.currentTimeMillis())
+            .putString("capture_last_parser_result", parsed.classification)
+            .putString("capture_last_parser_type", parsed.type)
+            .putString("capture_last_parser_description", parsed.description)
+            .apply()
+
         if (parsed.classification == "NAO_FINANCEIRA") return
 
         saveToHistory(posted.packageName.orEmpty(), title, text, parsed)
