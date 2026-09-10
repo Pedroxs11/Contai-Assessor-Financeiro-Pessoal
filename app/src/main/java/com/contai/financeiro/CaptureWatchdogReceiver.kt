@@ -15,10 +15,11 @@ import android.service.notification.NotificationListenerService
 private const val WATCHDOG_PREFS = "contai_notifications"
 private const val WATCHDOG_REQUEST_CODE = 7319
 private const val WATCHDOG_INTERVAL_MS = 5 * 60 * 1000L
+private const val WATCHDOG_RECHECK_AFTER_RECOVERY_MS = 60 * 1000L
 private const val WATCHDOG_STALE_AFTER_MS = 90 * 1000L
 
 object CaptureWatchdog {
-    fun schedule(context: Context) {
+    fun schedule(context: Context, delayMs: Long = WATCHDOG_INTERVAL_MS) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val pendingIntent = PendingIntent.getBroadcast(
             context,
@@ -29,7 +30,7 @@ object CaptureWatchdog {
 
         alarmManager.setAndAllowWhileIdle(
             AlarmManager.RTC_WAKEUP,
-            System.currentTimeMillis() + WATCHDOG_INTERVAL_MS,
+            System.currentTimeMillis() + delayMs,
             pendingIntent
         )
     }
@@ -37,6 +38,7 @@ object CaptureWatchdog {
 
 class CaptureWatchdogReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
+        var nextDelayMs = WATCHDOG_INTERVAL_MS
         try {
             val listenerComponent = ComponentName(
                 context,
@@ -59,10 +61,12 @@ class CaptureWatchdogReceiver : BroadcastReceiver() {
                 val stale = lastAliveAt == 0L || now - lastAliveAt > WATCHDOG_STALE_AFTER_MS
 
                 if (stale) {
+                    val attempts = prefs.getInt("watchdog_recovery_attempts", 0) + 1
                     prefs.edit()
                         .putString("listener_lifecycle_event", "watchdogRecoveryCycleRequested")
                         .putLong("listener_lifecycle_at", now)
                         .putLong("watchdog_last_rebind_at", now)
+                        .putInt("watchdog_recovery_attempts", attempts)
                         .apply()
 
                     if (Build.VERSION.SDK_INT >= 34) {
@@ -73,14 +77,19 @@ class CaptureWatchdogReceiver : BroadcastReceiver() {
                     } else {
                         NotificationListenerService.requestRebind(listenerComponent)
                     }
+
+                    // Depois de uma recuperação, verifica novamente mais cedo para não esperar
+                    // outros cinco minutos caso o fabricante mantenha o listener suspenso.
+                    nextDelayMs = WATCHDOG_RECHECK_AFTER_RECOVERY_MS
                 } else {
                     prefs.edit()
                         .putLong("watchdog_last_check_at", now)
+                        .putInt("watchdog_recovery_attempts", 0)
                         .apply()
                 }
             }
         } finally {
-            CaptureWatchdog.schedule(context)
+            CaptureWatchdog.schedule(context, nextDelayMs)
         }
     }
 }
