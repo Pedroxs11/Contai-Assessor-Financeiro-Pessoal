@@ -45,11 +45,27 @@ class FinanceNotificationListener : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
+        val now = System.currentTimeMillis()
+        val preferences = prefs()
+        val recoveryAttempts = preferences.getInt("watchdog_recovery_attempts", 0)
+
         saveLifecycleEvent("onListenerConnected")
-        startHeartbeat(); CaptureWatchdog.schedule(this)
-        prefs().edit().putBoolean("service_connected", true).putLong("listener_last_alive_at", System.currentTimeMillis())
-            .putString("last_package", "SISTEMA CONTAI").putString("last_title", "Serviço conectado")
-            .putString("last_text", "O Android conectou o Contai ao serviço de notificações.").apply()
+        startHeartbeat()
+        CaptureWatchdog.schedule(this)
+
+        val editor = preferences.edit()
+            .putBoolean("service_connected", true)
+            .putLong("listener_last_alive_at", now)
+            .putString("last_package", "SISTEMA CONTAI")
+            .putString("last_title", "Serviço conectado")
+            .putString("last_text", "O Android conectou o Contai ao serviço de notificações.")
+
+        if (recoveryAttempts > 0) {
+            editor
+                .putLong("watchdog_last_recovered_at", now)
+                .putInt("watchdog_last_recovery_attempts_completed", recoveryAttempts)
+        }
+        editor.putInt("watchdog_recovery_attempts", 0).apply()
     }
 
     override fun onListenerDisconnected() {
