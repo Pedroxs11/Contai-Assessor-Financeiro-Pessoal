@@ -17,8 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import org.json.JSONArray
 import java.text.DateFormat
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 @Composable
 fun CaptureDiagnosticsCard() {
@@ -36,15 +39,39 @@ fun CaptureDiagnosticsCard() {
     val lastParserResult = prefs.getString("capture_last_parser_result", "Sem registro").orEmpty()
     val lastSavedAt = prefs.getLong("capture_last_saved_at", 0L)
     val lastSavedPackage = prefs.getString("capture_last_saved_package", "").orEmpty()
+    val recentEventsJson = prefs.getString("capture_recent_events", "[]") ?: "[]"
     val aliveRecently = connected && lastAliveAt > 0L && System.currentTimeMillis() - lastAliveAt <= 45_000L
     val isXiaomiFamily = Build.MANUFACTURER.contains("xiaomi", true) || Build.BRAND.contains("xiaomi", true) || Build.BRAND.contains("redmi", true) || Build.BRAND.contains("poco", true)
     var recoveryFeedback by remember { mutableStateOf<String?>(null) }
+    var showRecentEvents by remember { mutableStateOf(false) }
 
     fun formattedTime(timestamp: Long): String = if (timestamp <= 0L) "Ainda não registrado" else DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(timestamp))
-    fun compactDebugText(value: String): String {
+    fun shortTime(timestamp: Long): String = if (timestamp <= 0L) "--:--" else SimpleDateFormat("HH:mm:ss", Locale("pt", "BR")).format(Date(timestamp))
+    fun compactDebugText(value: String, limit: Int = 220): String {
         val normalized = value.replace(Regex("\\s+"), " ").trim()
         if (normalized.isBlank()) return "Sem texto recebido"
-        return if (normalized.length <= 220) normalized else normalized.take(217) + "..."
+        return if (normalized.length <= limit) normalized else normalized.take(limit - 3) + "..."
+    }
+
+    val recentEvents = remember(recentEventsJson) {
+        buildList {
+            val json = runCatching { JSONArray(recentEventsJson) }.getOrElse { JSONArray() }
+            for (i in json.length() - 1 downTo 0) {
+                json.optJSONObject(i)?.let { item ->
+                    add(
+                        listOf(
+                            item.optLong("timestamp", 0L).toString(),
+                            item.optString("package", ""),
+                            item.optString("title", ""),
+                            item.optString("text", ""),
+                            item.optString("classification", ""),
+                            item.optString("type", ""),
+                            if (item.has("amount")) item.optDouble("amount").toString() else ""
+                        )
+                    )
+                }
+            }
+        }
     }
 
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -75,6 +102,41 @@ fun CaptureDiagnosticsCard() {
                 Text("Conteúdo recebido: ${compactDebugText(lastNotificationText)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text("Último evento do serviço: $lastEvent • ${formattedTime(lastEventAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            if (recentEvents.isNotEmpty()) {
+                OutlinedButton(
+                    onClick = { showRecentEvents = !showRecentEvents },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (showRecentEvents) "Ocultar últimos eventos" else "Ver últimos eventos (${recentEvents.size})")
+                }
+
+                if (showRecentEvents) {
+                    Text("Últimas notificações recebidas", style = MaterialTheme.typography.labelLarge)
+                    recentEvents.forEachIndexed { index, event ->
+                        val timestamp = event[0].toLongOrNull() ?: 0L
+                        val packageName = event[1]
+                        val title = event[2]
+                        val text = event[3]
+                        val classification = event[4]
+                        val type = event[5]
+                        val amount = event[6].toDoubleOrNull()
+                        val amountText = amount?.let { " • ${formatCurrency(it)}" }.orEmpty()
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text("${index + 1}. ${shortTime(timestamp)} • ${friendlyAppName(packageName)}", style = MaterialTheme.typography.labelMedium)
+                                if (title.isNotBlank()) Text(compactDebugText(title, 90), style = MaterialTheme.typography.bodySmall)
+                                Text(compactDebugText(text, 180), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("$classification • $type$amountText", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
 
             if (isXiaomiFamily) {
                 Text("Neste aparelho, o sistema pode encerrar apps em segundo plano mesmo com a permissão ativa. Se a captura parar ao fechar o app, libere o Contai das restrições de bateria/autoinicialização.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
