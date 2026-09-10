@@ -1,7 +1,6 @@
 package com.contai.financeiro
 
 import android.Manifest
-import android.app.AlarmManager
 import android.app.DatePickerDialog
 import android.app.PendingIntent
 import android.app.TimePickerDialog
@@ -158,17 +157,15 @@ private fun agendaPendingIntent(context: Context, item: AgendaItem): PendingInte
 
 private fun scheduleAgendaReminder(context: Context, item: AgendaItem) {
     if (item.completed || item.dueAt <= System.currentTimeMillis()) return
-    val alarmManager = context.getSystemService(AlarmManager::class.java)
-    alarmManager.setAndAllowWhileIdle(
-        AlarmManager.RTC_WAKEUP,
-        item.dueAt,
-        agendaPendingIntent(context, item)
+    AgendaAlarmScheduler.schedule(
+        context = context,
+        triggerAtMillis = item.dueAt,
+        pendingIntent = agendaPendingIntent(context, item)
     )
 }
 
 private fun cancelAgendaReminder(context: Context, item: AgendaItem) {
-    val alarmManager = context.getSystemService(AlarmManager::class.java)
-    alarmManager.cancel(agendaPendingIntent(context, item))
+    AgendaAlarmScheduler.cancel(context, agendaPendingIntent(context, item))
 }
 
 @Composable
