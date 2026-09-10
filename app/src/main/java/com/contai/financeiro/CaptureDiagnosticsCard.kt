@@ -31,6 +31,7 @@ fun CaptureDiagnosticsCard() {
     val lastNotificationAt = prefs.getLong("debug_last_event_at", 0L)
     val lastNotificationPackage = prefs.getString("debug_last_package", "").orEmpty()
     val lastNotificationTitle = prefs.getString("debug_last_title", "").orEmpty()
+    val lastNotificationText = prefs.getString("debug_last_text", "").orEmpty()
     val lastParserAt = prefs.getLong("capture_last_parser_at", 0L)
     val lastParserResult = prefs.getString("capture_last_parser_result", "Sem registro").orEmpty()
     val lastSavedAt = prefs.getLong("capture_last_saved_at", 0L)
@@ -40,6 +41,11 @@ fun CaptureDiagnosticsCard() {
     var recoveryFeedback by remember { mutableStateOf<String?>(null) }
 
     fun formattedTime(timestamp: Long): String = if (timestamp <= 0L) "Ainda não registrado" else DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(timestamp))
+    fun compactDebugText(value: String): String {
+        val normalized = value.replace(Regex("\\s+"), " ").trim()
+        if (normalized.isBlank()) return "Sem texto recebido"
+        return if (normalized.length <= 220) normalized else normalized.take(217) + "..."
+    }
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -66,6 +72,7 @@ fun CaptureDiagnosticsCard() {
                     else -> "Origem não identificada"
                 }
                 Text("Origem da última notificação: $origin", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Conteúdo recebido: ${compactDebugText(lastNotificationText)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text("Último evento do serviço: $lastEvent • ${formattedTime(lastEventAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
