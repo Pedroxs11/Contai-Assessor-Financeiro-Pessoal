@@ -2,6 +2,7 @@ package com.contai.financeiro
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,12 +39,23 @@ private enum class ReportPeriod(val label: String) {
     MONTH("Este mês"), ALL("Tudo")
 }
 
+private enum class ReportGroup(val label: String) {
+    ALL("Todos"), INCOME("Receitas"), EXPENSE("Despesas"), PROCEEDS("Proventos")
+}
+
+private data class ReportItem(
+    val record: TransactionRecord,
+    val category: String
+)
+
 @Composable
 fun ReportsScreen(hideValues: Boolean) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("contai_notifications", Context.MODE_PRIVATE)
     val history = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
     var period by remember { mutableStateOf(ReportPeriod.MONTH) }
+    var selectedGroup by remember { mutableStateOf(ReportGroup.ALL) }
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
 
     val monthStart = Calendar.getInstance().apply {
         set(Calendar.DAY_OF_MONTH, 1)
@@ -56,30 +68,65 @@ fun ReportsScreen(hideValues: Boolean) {
     var income = 0.0
     var expenses = 0.0
     var proceeds = 0.0
+    val incomeByCategory = mutableMapOf<String, Double>()
     val expensesByCategory = mutableMapOf<String, Double>()
+    val records = mutableListOf<ReportItem>()
 
     for (i in 0 until history.length()) {
         val item = history.optJSONObject(i) ?: continue
         val classification = item.optString("classification", item.optString("status", ""))
         if (classification != "CONFIRMADA") continue
 
-        val timestamp = item.optLong("timestamp", 0L)
+        val timestamp = item.optLong("movementTimestamp", item.optLong("timestamp", 0L))
         if (period == ReportPeriod.MONTH && timestamp < monthStart) continue
 
         val amount = item.optDouble("amount", 0.0)
+        val type = item.optString("type", "")
         val investmentType = item.optString("investmentType", "")
+        val category = item.optString("category", "").ifBlank {
+            if (type == "ENTRADA") "Receitas" else "Outros"
+        }
+
+        val record = TransactionRecord(
+            amount = if (item.has("amount")) item.optDouble("amount") else null,
+            type = type,
+            timestamp = item.optLong("timestamp", 0L),
+            category = category,
+            status = classification,
+            source = item.optString("package", ""),
+            title = item.optString("title", ""),
+            text = item.optString("text", ""),
+            confidence = item.optInt("confidence", 0),
+            investmentType = investmentType,
+            movementTimestamp = timestamp
+        )
+        records += ReportItem(record, category)
+
         when {
             investmentType.isNotBlank() -> proceeds += amount
-            item.optString("type") == "ENTRADA" -> income += amount
-            item.optString("type") == "DESPESA" -> {
+            type == "ENTRADA" -> {
+                income += amount
+                incomeByCategory[category] = (incomeByCategory[category] ?: 0.0) + amount
+            }
+            type == "DESPESA" -> {
                 expenses += amount
-                val category = item.optString("category", "Outros").ifBlank { "Outros" }
                 expensesByCategory[category] = (expensesByCategory[category] ?: 0.0) + amount
             }
         }
     }
 
     fun valueText(value: Double): String = if (hideValues) "R$ ••••" else formatCurrency(value)
+
+    val filteredRecords = records.map { it.record }.filter { record ->
+        val groupMatches = when (selectedGroup) {
+            ReportGroup.ALL -> true
+            ReportGroup.INCOME -> record.type == "ENTRADA" && record.investmentType.isBlank()
+            ReportGroup.EXPENSE -> record.type == "DESPESA"
+            ReportGroup.PROCEEDS -> record.investmentType.isNotBlank()
+        }
+        val categoryMatches = selectedCategory == null || record.category == selectedCategory
+        groupMatches && categoryMatches
+    }
 
     Column(
         modifier = Modifier
@@ -90,7 +137,7 @@ fun ReportsScreen(hideValues: Boolean) {
     ) {
         Text("Relatórios", style = MaterialTheme.typography.headlineMedium)
         Text(
-            "Acompanhe o movimento do seu dinheiro.",
+            "Veja os totais e toque em uma categoria para abrir os lançamentos.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -99,7 +146,10 @@ fun ReportsScreen(hideValues: Boolean) {
             ReportPeriod.entries.forEach { option ->
                 FilterChip(
                     selected = period == option,
-                    onClick = { period = option },
+                    onClick = {
+                        period = option
+                        selectedCategory = null
+                    },
                     label = { Text(option.label) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -110,17 +160,104 @@ fun ReportsScreen(hideValues: Boolean) {
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ReportCard("Entradas", valueText(income), Modifier.weight(1f), MaterialTheme.colorScheme.secondary)
-            ReportCard("Despesas", valueText(expenses), Modifier.weight(1f), MaterialTheme.colorScheme.error)
+            ReportCard("Receitas", valueText(income), Modifier.weight(1f), MaterialTheme.colorScheme.secondary) {
+                selectedGroup = ReportGroup.INCOME
+                selectedCategory = null
+            }
+            ReportCard("Despesas", valueText(expenses), Modifier.weight(1f), MaterialTheme.colorScheme.error) {
+                selectedGroup = ReportGroup.EXPENSE
+                selectedCategory = null
+            }
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ReportCard("Saldo", valueText(income - expenses), Modifier.weight(1f), MaterialTheme.colorScheme.primary)
-            ReportCard("Proventos", valueText(proceeds), Modifier.weight(1f), MaterialTheme.colorScheme.primary)
+            ReportCard("Saldo", valueText(income - expenses), Modifier.weight(1f), MaterialTheme.colorScheme.primary) {
+                selectedGroup = ReportGroup.ALL
+                selectedCategory = null
+            }
+            ReportCard("Proventos", valueText(proceeds), Modifier.weight(1f), MaterialTheme.colorScheme.primary) {
+                selectedGroup = ReportGroup.PROCEEDS
+                selectedCategory = null
+            }
         }
 
         IncomeExpenseChart(income = income, expenses = expenses, hideValues = hideValues)
-        ExpensesByCategoryChart(expensesByCategory = expensesByCategory, hideValues = hideValues)
+
+        CategorySection(
+            title = "Receitas por categoria",
+            subtitle = "Pix, salário, extra e outras receitas.",
+            values = incomeByCategory,
+            hideValues = hideValues,
+            accentColor = MaterialTheme.colorScheme.secondary,
+            onCategoryClick = { category ->
+                selectedGroup = ReportGroup.INCOME
+                selectedCategory = category
+            }
+        )
+
+        CategorySection(
+            title = "Despesas por categoria",
+            subtitle = "Combustível, alimentação, lazer e demais gastos.",
+            values = expensesByCategory,
+            hideValues = hideValues,
+            accentColor = MaterialTheme.colorScheme.error,
+            onCategoryClick = { category ->
+                selectedGroup = ReportGroup.EXPENSE
+                selectedCategory = category
+            }
+        )
+
         ProceedsCard(proceeds = proceeds, hideValues = hideValues, periodLabel = period.label)
+
+        Text("Histórico e filtros", style = MaterialTheme.typography.titleLarge)
+        Text(
+            selectedCategory?.let { "Mostrando: $it" } ?: "Escolha um tipo ou toque em uma categoria acima.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ReportGroup.entries.forEach { group ->
+                FilterChip(
+                    selected = selectedGroup == group && selectedCategory == null,
+                    onClick = {
+                        selectedGroup = group
+                        selectedCategory = null
+                    },
+                    label = { Text(group.label) }
+                )
+            }
+        }
+
+        if (selectedCategory != null) {
+            FilterChip(
+                selected = true,
+                onClick = { selectedCategory = null },
+                label = { Text("${selectedCategory}  ×") }
+            )
+        }
+
+        if (filteredRecords.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Text(
+                    "Nenhum lançamento encontrado neste filtro.",
+                    modifier = Modifier.padding(18.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            GroupedHistoryTransactions(
+                transactions = filteredRecords,
+                onConfirm = {},
+                onCorrect = {},
+                onIgnore = {},
+                onDelete = {},
+                showDateGroups = true
+            )
+        }
     }
 }
 
@@ -136,7 +273,7 @@ private fun IncomeExpenseChart(income: Double, expenses: Double, hideValues: Boo
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("Entradas × Despesas", style = MaterialTheme.typography.titleMedium)
+            Text("Receitas × Despesas", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Comparação visual do período selecionado.",
                 style = MaterialTheme.typography.bodySmall,
@@ -149,7 +286,7 @@ private fun IncomeExpenseChart(income: Double, expenses: Double, hideValues: Boo
                 verticalAlignment = Alignment.Bottom
             ) {
                 VerticalChartBar(
-                    label = "Entradas",
+                    label = "Receitas",
                     value = if (hideValues) "R$ ••••" else formatCurrency(income),
                     ratio = incomeRatio,
                     barColor = MaterialTheme.colorScheme.secondary
@@ -189,8 +326,15 @@ private fun VerticalChartBar(
 }
 
 @Composable
-private fun ExpensesByCategoryChart(expensesByCategory: Map<String, Double>, hideValues: Boolean) {
-    val sortedCategories = expensesByCategory.entries.sortedByDescending { it.value }
+private fun CategorySection(
+    title: String,
+    subtitle: String,
+    values: Map<String, Double>,
+    hideValues: Boolean,
+    accentColor: androidx.compose.ui.graphics.Color,
+    onCategoryClick: (String) -> Unit
+) {
+    val sortedCategories = values.entries.sortedByDescending { it.value }
     val maxValue = maxOf(sortedCategories.maxOfOrNull { it.value } ?: 0.0, 1.0)
 
     Card(
@@ -199,24 +343,26 @@ private fun ExpensesByCategoryChart(expensesByCategory: Map<String, Double>, hid
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("Despesas por categoria", style = MaterialTheme.typography.titleMedium)
+            Text(title, style = MaterialTheme.typography.titleMedium)
             Text(
-                "Veja onde seu dinheiro está sendo mais utilizado.",
+                subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (sortedCategories.isEmpty()) {
                 Text(
-                    "Nenhuma despesa confirmada neste período.",
+                    "Nenhum lançamento confirmado neste período.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
                 sortedCategories.forEach { (category, value) ->
                     ChartBar(
-                        category,
-                        (value / maxValue).toFloat().coerceIn(0f, 1f),
-                        if (hideValues) "R$ ••••" else formatCurrency(value)
+                        label = category,
+                        ratio = (value / maxValue).toFloat().coerceIn(0f, 1f),
+                        value = if (hideValues) "R$ ••••" else formatCurrency(value),
+                        accentColor = accentColor,
+                        onClick = { onCategoryClick(category) }
                     )
                 }
             }
@@ -248,8 +394,20 @@ private fun ProceedsCard(proceeds: Double, hideValues: Boolean, periodLabel: Str
 }
 
 @Composable
-private fun ChartBar(label: String, ratio: Float, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+private fun ChartBar(
+    label: String,
+    ratio: Float,
+    value: String,
+    accentColor: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, style = MaterialTheme.typography.labelLarge)
             Text(value, style = MaterialTheme.typography.labelLarge)
@@ -265,7 +423,7 @@ private fun ChartBar(label: String, ratio: Float, value: String) {
                 modifier = Modifier
                     .fillMaxWidth(ratio)
                     .height(10.dp)
-                    .background(MaterialTheme.colorScheme.error, RoundedCornerShape(999.dp))
+                    .background(accentColor, RoundedCornerShape(999.dp))
             )
         }
     }
@@ -276,10 +434,11 @@ private fun ReportCard(
     title: String,
     value: String,
     modifier: Modifier = Modifier,
-    accentColor: androidx.compose.ui.graphics.Color
+    accentColor: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
