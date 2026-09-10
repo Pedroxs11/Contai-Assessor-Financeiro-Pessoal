@@ -215,16 +215,32 @@ fun ReportsScreen(hideValues: Boolean) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ReportGroup.entries.forEach { group ->
-                FilterChip(
-                    selected = selectedGroup == group && selectedCategory == null,
-                    onClick = {
-                        selectedGroup = group
-                        selectedCategory = null
-                    },
-                    label = { Text(group.label) }
-                )
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(ReportGroup.ALL, ReportGroup.INCOME).forEach { group ->
+                    FilterChip(
+                        modifier = Modifier.weight(1f),
+                        selected = selectedGroup == group && selectedCategory == null,
+                        onClick = {
+                            selectedGroup = group
+                            selectedCategory = null
+                        },
+                        label = { Text(group.label) }
+                    )
+                }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(ReportGroup.EXPENSE, ReportGroup.PROCEEDS).forEach { group ->
+                    FilterChip(
+                        modifier = Modifier.weight(1f),
+                        selected = selectedGroup == group && selectedCategory == null,
+                        onClick = {
+                            selectedGroup = group
+                            selectedCategory = null
+                        },
+                        label = { Text(group.label) }
+                    )
+                }
             }
         }
 
@@ -255,7 +271,8 @@ fun ReportsScreen(hideValues: Boolean) {
                 onCorrect = {},
                 onIgnore = {},
                 onDelete = {},
-                showDateGroups = true
+                showDateGroups = true,
+                showActions = false
             )
         }
     }
