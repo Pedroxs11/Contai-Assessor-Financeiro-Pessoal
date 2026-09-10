@@ -40,6 +40,9 @@ fun CaptureDiagnosticsCard() {
     val lastSavedAt = prefs.getLong("capture_last_saved_at", 0L)
     val lastSavedPackage = prefs.getString("capture_last_saved_package", "").orEmpty()
     val recentEventsJson = prefs.getString("capture_recent_events", "[]") ?: "[]"
+    val watchdogRecoveryAttempts = prefs.getInt("watchdog_recovery_attempts", 0)
+    val watchdogLastRebindAt = prefs.getLong("watchdog_last_rebind_at", 0L)
+    val watchdogLastCheckAt = prefs.getLong("watchdog_last_check_at", 0L)
     val aliveRecently = connected && lastAliveAt > 0L && System.currentTimeMillis() - lastAliveAt <= 45_000L
     val isXiaomiFamily = Build.MANUFACTURER.contains("xiaomi", true) || Build.BRAND.contains("xiaomi", true) || Build.BRAND.contains("redmi", true) || Build.BRAND.contains("poco", true)
     var recoveryFeedback by remember { mutableStateOf<String?>(null) }
@@ -91,6 +94,18 @@ fun CaptureDiagnosticsCard() {
             Text("4. Último lançamento salvo: ${formattedTime(lastSavedAt)}${if (lastSavedPackage.isNotBlank()) " • $lastSavedPackage" else ""}", style = MaterialTheme.typography.bodySmall)
 
             Text("Último sinal do serviço: ${formattedTime(lastAliveAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Watchdog: ${if (watchdogRecoveryAttempts > 0) "$watchdogRecoveryAttempts tentativa(s) seguida(s) de recuperação" else "sem recuperação pendente"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (watchdogRecoveryAttempts > 1) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (watchdogLastRebindAt > 0L) {
+                Text("Última tentativa automática: ${formattedTime(watchdogLastRebindAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (watchdogLastCheckAt > 0L) {
+                Text("Última checagem saudável: ${formattedTime(watchdogLastCheckAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
             if (lastNotificationAt > 0L) {
                 val origin = when {
                     lastNotificationTitle.isNotBlank() && lastNotificationPackage.isNotBlank() -> "$lastNotificationTitle • $lastNotificationPackage"
