@@ -39,7 +39,8 @@ fun GroupedHistoryTransactions(
     onCorrect: (TransactionRecord) -> Unit,
     onIgnore: (Long) -> Unit,
     onDelete: (TransactionRecord) -> Unit,
-    showDateGroups: Boolean = true
+    showDateGroups: Boolean = true,
+    showActions: Boolean = true
 ) {
     var selectedDay by remember { mutableStateOf<Long?>(null) }
     val visibleTransactions = if (showDateGroups) filterTransactionsByDay(transactions, selectedDay) else transactions
@@ -70,7 +71,14 @@ fun GroupedHistoryTransactions(
             HistoryDateHeader(group)
             previousGroup = group
         }
-        TransactionHistoryCard(transaction, onConfirm, onCorrect, onIgnore, onDelete)
+        TransactionHistoryCard(
+            transaction = transaction,
+            onConfirm = onConfirm,
+            onCorrect = onCorrect,
+            onIgnore = onIgnore,
+            onDelete = onDelete,
+            showActions = showActions
+        )
     }
 }
 
@@ -80,7 +88,8 @@ fun TransactionHistoryCard(
     onConfirm: (Long) -> Unit,
     onCorrect: (TransactionRecord) -> Unit,
     onIgnore: (Long) -> Unit,
-    onDelete: (TransactionRecord) -> Unit
+    onDelete: (TransactionRecord) -> Unit,
+    showActions: Boolean = true
 ) {
     var menuExpanded by remember(transaction.timestamp) { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
@@ -108,7 +117,7 @@ fun TransactionHistoryCard(
                             else -> MaterialTheme.colorScheme.onSurface
                         }
                     )
-                    if (transaction.status == "CONFIRMADA") {
+                    if (showActions && transaction.status == "CONFIRMADA") {
                         IconButton(onClick = { menuExpanded = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                             DropdownMenuItem(text = { Text("Editar") }, onClick = { menuExpanded = false; onCorrect(transaction) })
@@ -123,7 +132,7 @@ fun TransactionHistoryCard(
             Text("${transaction.type} • $statusText", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
             Text(dateText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (transaction.status == "POSSIVEL") {
+            if (showActions && transaction.status == "POSSIVEL") {
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button({ onConfirm(transaction.timestamp) }, Modifier.weight(1f)) { Text("Confirmar") }
