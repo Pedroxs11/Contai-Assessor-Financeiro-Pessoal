@@ -43,6 +43,8 @@ fun CaptureDiagnosticsCard() {
     val watchdogRecoveryAttempts = prefs.getInt("watchdog_recovery_attempts", 0)
     val watchdogLastRebindAt = prefs.getLong("watchdog_last_rebind_at", 0L)
     val watchdogLastCheckAt = prefs.getLong("watchdog_last_check_at", 0L)
+    val watchdogLastRecoveredAt = prefs.getLong("watchdog_last_recovered_at", 0L)
+    val watchdogLastRecoveryAttemptsCompleted = prefs.getInt("watchdog_last_recovery_attempts_completed", 0)
     val aliveRecently = connected && lastAliveAt > 0L && System.currentTimeMillis() - lastAliveAt <= 45_000L
     val isXiaomiFamily = Build.MANUFACTURER.contains("xiaomi", true) || Build.BRAND.contains("xiaomi", true) || Build.BRAND.contains("redmi", true) || Build.BRAND.contains("poco", true)
     var recoveryFeedback by remember { mutableStateOf<String?>(null) }
@@ -101,6 +103,13 @@ fun CaptureDiagnosticsCard() {
             )
             if (watchdogLastRebindAt > 0L) {
                 Text("Última tentativa automática: ${formattedTime(watchdogLastRebindAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (watchdogLastRecoveredAt > 0L) {
+                Text(
+                    "Última recuperação concluída: ${formattedTime(watchdogLastRecoveredAt)} • $watchdogLastRecoveryAttemptsCompleted tentativa(s)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
             if (watchdogLastCheckAt > 0L) {
                 Text("Última checagem saudável: ${formattedTime(watchdogLastCheckAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
