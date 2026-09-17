@@ -193,24 +193,38 @@ class FinanceNotificationListener : NotificationListenerService() {
         val notification = sbn?.notification ?: return
         val extras = notification.extras
 
-        val title = listOf(
+        val titleParts = listOf(
             extras.getCharSequence("android.title")?.toString().orEmpty(),
             extras.getCharSequence("android.title.big")?.toString().orEmpty(),
             extras.getCharSequence("android.subText")?.toString().orEmpty()
-        ).firstOrNull { it.isNotBlank() }.orEmpty()
+        ).map { it.trim() }.filter { it.isNotBlank() }.distinct()
+
+        val title = titleParts.firstOrNull().orEmpty()
 
         val textLines =
             extras.getCharSequenceArray("android.textLines")
+                ?.map { it.toString().trim() }
+                ?.filter { it.isNotBlank() }
                 ?.joinToString(" ")
                 .orEmpty()
 
+        // Some Samsung/One UI notifications split useful financial information
+        // across multiple extras. Keep every distinct non-empty field instead of
+        // taking only the first one, otherwise the amount or Pix direction can
+        // be lost before it reaches FinancialParser.
         val text = listOf(
             extras.getCharSequence("android.bigText")?.toString().orEmpty(),
             extras.getCharSequence("android.text")?.toString().orEmpty(),
             textLines,
+            extras.getCharSequence("android.summaryText")?.toString().orEmpty(),
+            extras.getCharSequence("android.infoText")?.toString().orEmpty(),
             extras.getCharSequence("android.subText")?.toString().orEmpty(),
             notification.tickerText?.toString().orEmpty()
-        ).firstOrNull { it.isNotBlank() }.orEmpty()
+        )
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(" | ")
 
         prefs().edit()
             .putLong("listener_last_alive_at", System.currentTimeMillis())
