@@ -14,9 +14,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -34,6 +34,12 @@ jobs:
 
       - name: Ensure Gradle wrapper is executable
         run: chmod +x gradlew
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Run Android lint
+        run: ./gradlew lintDebug --stacktrace
 
       - name: Compile debug APK
         run: ./gradlew assembleDebug --stacktrace
