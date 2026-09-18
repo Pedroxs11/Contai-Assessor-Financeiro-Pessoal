@@ -92,6 +92,45 @@ class FinanceNotificationListener : NotificationListenerService() {
         super.onDestroy()
     }
 
+    private fun isRecentDuplicate(
+        history: JSONArray,
+        packageName: String,
+        title: String,
+        text: String,
+        parsed: ParsedTransaction,
+        now: Long
+    ): Boolean {
+        // OEMs can emit the same financial notification more than once and
+        // another event may arrive between the duplicates. Looking only at the
+        // last history item misses that case, so inspect all recent entries.
+        for (index in history.length() - 1 downTo 0) {
+            val item = history.optJSONObject(index) ?: continue
+            val timestamp = item.optLong("timestamp", 0L)
+
+            if (now - timestamp > 30_000) {
+                break
+            }
+
+            val storedAmount = if (item.has("amount")) {
+                item.optDouble("amount")
+            } else {
+                null
+            }
+
+            if (
+                item.optString("package") == packageName &&
+                item.optString("title") == title &&
+                item.optString("text") == text &&
+                item.optString("type") == parsed.type &&
+                storedAmount == parsed.amount
+            ) {
+                return true
+            }
+        }
+
+        return false
+    }
+
     private fun saveToHistory(
         packageName: String,
         title: String,
@@ -102,36 +141,14 @@ class FinanceNotificationListener : NotificationListenerService() {
         val history = JSONArray(
             prefs.getString("transaction_history", "[]") ?: "[]"
         )
+        val now = System.currentTimeMillis()
 
-        if (history.length() > 0) {
-            val lastItem = history.getJSONObject(history.length() - 1)
-            val lastTimestamp = lastItem.optLong("timestamp", 0L)
-            val now = System.currentTimeMillis()
-
-            val samePackage = lastItem.optString("package") == packageName
-            val sameTitle = lastItem.optString("title") == title
-            val sameText = lastItem.optString("text") == text
-            val sameType = lastItem.optString("type") == parsed.type
-
-            val lastAmount = if (lastItem.has("amount")) {
-                lastItem.optDouble("amount")
-            } else {
-                null
-            }
-
-            val sameAmount = lastAmount == parsed.amount
-            val within30Seconds = now - lastTimestamp <= 30_000
-
-            if (
-                samePackage &&
-                sameTitle &&
-                sameText &&
-                sameType &&
-                sameAmount &&
-                within30Seconds
-            ) {
-                return
-            }
+        if (isRecentDuplicate(history, packageName, title, text, parsed, now)) {
+            prefs.edit()
+                .putLong("debug_last_duplicate_at", now)
+                .putString("debug_last_duplicate_package", packageName)
+                .apply()
+            return
         }
 
         val normalizedLearningText =
@@ -168,7 +185,7 @@ class FinanceNotificationListener : NotificationListenerService() {
                 }
 
         val item = JSONObject()
-            .put("timestamp", System.currentTimeMillis())
+            .put("timestamp", now)
             .put("package", packageName)
             .put("title", title)
             .put("text", text)
