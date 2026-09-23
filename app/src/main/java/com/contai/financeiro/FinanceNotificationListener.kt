@@ -107,8 +107,10 @@ class FinanceNotificationListener : NotificationListenerService() {
             val item = history.optJSONObject(index) ?: continue
             val timestamp = item.optLong("timestamp", 0L)
 
-            if (now - timestamp > 30_000) {
-                break
+            // Do not assume history is perfectly ordered: restored/imported
+            // entries may be out of order, so skip stale timestamps individually.
+            if (timestamp <= 0L || now < timestamp || now - timestamp > 30_000) {
+                continue
             }
 
             val storedAmount = if (item.has("amount")) {
