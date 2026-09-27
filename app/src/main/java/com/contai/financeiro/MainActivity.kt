@@ -68,6 +68,9 @@ fun ContaiApp() {
     var debugLastTitle by remember { mutableStateOf("") }
     var listenerLifecycleEvent by remember { mutableStateOf("") }
     var listenerLifecycleAt by remember { mutableStateOf(0L) }
+    var debugLastClassification by remember { mutableStateOf("") }
+    var debugLastType by remember { mutableStateOf("") }
+    var debugLastAmount by remember { mutableStateOf("") }
     var transactionHistory by remember { mutableStateOf(listOf<TransactionRecord>()) }
     var transactionToCorrect by remember { mutableStateOf<TransactionRecord?>(null) }
     var customIncomeCategories by remember { mutableStateOf(listOf<String>()) }
@@ -134,6 +137,9 @@ fun ContaiApp() {
         debugLastTitle = prefs.getString("debug_last_title", "") ?: ""
         listenerLifecycleEvent = prefs.getString("listener_lifecycle_event", "") ?: ""
         listenerLifecycleAt = prefs.getLong("listener_lifecycle_at", 0L)
+        debugLastClassification = prefs.getString("debug_last_classification", "") ?: ""
+        debugLastType = prefs.getString("debug_last_type", "") ?: ""
+        debugLastAmount = prefs.getString("debug_last_amount", "") ?: ""
 
         customIncomeCategories = prefs
             .getStringSet("custom_income_categories", emptySet())
@@ -714,6 +720,9 @@ fun ContaiApp() {
                             (eventAge?.let { "há ${it}s" } ?: "nenhuma registrada"))
                         Text("Aplicativo de origem: " + debugLastPackage.ifBlank { "não identificado" })
                         Text("Último título: " + debugLastTitle.ifBlank { "não identificado" })
+                        Text("Interpretação: " + debugLastClassification.ifBlank { "sem resultado" })
+                        Text("Tipo identificado: " + debugLastType.ifBlank { "não identificado" })
+                        Text("Valor identificado: " + debugLastAmount.ifBlank { "não identificado" })
                         Text(
                             "Se o serviço está conectado mas a notificação de teste não aparece aqui, " +
                             "verifique as restrições de bateria e o acesso às notificações do Android.",
