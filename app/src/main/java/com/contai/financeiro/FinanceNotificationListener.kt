@@ -255,6 +255,14 @@ class FinanceNotificationListener : NotificationListenerService() {
 
         val parsed = FinancialParser.parse(sbn?.packageName.orEmpty(), title, text)
 
+        // Persist the parser outcome even when a notification is discarded.
+        // This separates OEM delivery failures from financial parsing failures.
+        prefs().edit()
+            .putString("debug_last_classification", parsed.classification)
+            .putString("debug_last_type", parsed.type)
+            .putString("debug_last_amount", parsed.amount?.toString().orEmpty())
+            .apply()
+
         if (parsed.classification == "NAO_FINANCEIRA") {
             return
         }
