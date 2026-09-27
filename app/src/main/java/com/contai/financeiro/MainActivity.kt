@@ -66,6 +66,8 @@ fun ContaiApp() {
     var debugLastEventAt by remember { mutableStateOf(0L) }
     var debugLastPackage by remember { mutableStateOf("") }
     var debugLastTitle by remember { mutableStateOf("") }
+    var listenerLifecycleEvent by remember { mutableStateOf("") }
+    var listenerLifecycleAt by remember { mutableStateOf(0L) }
     var transactionHistory by remember { mutableStateOf(listOf<TransactionRecord>()) }
     var transactionToCorrect by remember { mutableStateOf<TransactionRecord?>(null) }
     var customIncomeCategories by remember { mutableStateOf(listOf<String>()) }
@@ -130,6 +132,8 @@ fun ContaiApp() {
         debugLastEventAt = prefs.getLong("debug_last_event_at", 0L)
         debugLastPackage = prefs.getString("debug_last_package", "") ?: ""
         debugLastTitle = prefs.getString("debug_last_title", "") ?: ""
+        listenerLifecycleEvent = prefs.getString("listener_lifecycle_event", "") ?: ""
+        listenerLifecycleAt = prefs.getLong("listener_lifecycle_at", 0L)
 
         customIncomeCategories = prefs
             .getStringSet("custom_income_categories", emptySet())
@@ -674,7 +678,7 @@ fun ContaiApp() {
                                     !notificationAccess ->
                                         "Ative o acesso às notificações"
                                     listenerHealthy ->
-                                        "O Contai está acompanhando suas notificações"
+                                        "Serviço conectado; confirme a captura com uma notificação de teste"
                                     else ->
                                         "A captura automática precisa de atenção"
                                 },
@@ -689,6 +693,31 @@ fun ContaiApp() {
                                 else -> "⚠️"
                             },
                             style = MaterialTheme.typography.titleLarge
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Distinguish a live service from actual notification delivery.
+                // A heartbeat alone cannot prove Samsung/Xiaomi delivered events.
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Diagnóstico da captura", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Serviço: " + if (listenerHealthy) "conectado" else "desconectado ou sem resposta")
+                        Text("Último evento do serviço: " + listenerLifecycleEvent.ifBlank { "nenhum" })
+                        val eventAge = if (debugLastEventAt > 0L)
+                            (System.currentTimeMillis() - debugLastEventAt).coerceAtLeast(0L) / 1000L
+                        else null
+                        Text("Última notificação recebida: " +
+                            (eventAge?.let { "há ${it}s" } ?: "nenhuma registrada"))
+                        Text("Aplicativo de origem: " + debugLastPackage.ifBlank { "não identificado" })
+                        Text("Último título: " + debugLastTitle.ifBlank { "não identificado" })
+                        Text(
+                            "Se o serviço está conectado mas a notificação de teste não aparece aqui, " +
+                            "verifique as restrições de bateria e o acesso às notificações do Android.",
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
