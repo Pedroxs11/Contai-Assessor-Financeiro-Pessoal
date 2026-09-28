@@ -66,6 +66,16 @@ jobs:
           printf '%s' "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" > "${RUNNER_TEMP}/google-play-service-account.json"
           python3 -m json.tool "${RUNNER_TEMP}/google-play-service-account.json" >/dev/null
 
+      - name: Verify AAB signature before upload
+        run: |
+          set -euo pipefail
+          AAB="app/build/outputs/bundle/release/app-release.aab"
+          jarsigner -verify -verbose -certs "$AAB" >/dev/null 2>&1 || {
+            echo "::error::Generated AAB is not JAR-signed."
+            exit 1
+          }
+          echo "AAB JAR signature verified."
+
       - name: Upload to Google Play Internal Testing only
         uses: r0adkll/upload-google-play@v1
         with:
