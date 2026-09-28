@@ -24,14 +24,35 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Restore upload keystore
+      - name: Validate signing secrets and restore upload keystore
         env:
           CONTAI_KEYSTORE_BASE64: ${{ secrets.CONTAI_KEYSTORE_BASE64 }}
+          CONTAI_STORE_PASSWORD: ${{ secrets.CONTAI_STORE_PASSWORD }}
+          CONTAI_KEY_ALIAS: ${{ secrets.CONTAI_KEY_ALIAS }}
+          CONTAI_KEY_PASSWORD: ${{ secrets.CONTAI_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          test -n "$CONTAI_KEYSTORE_BASE64"
-          printf '%s' "$CONTAI_KEYSTORE_BASE64" | base64 --decode > "${RUNNER_TEMP}/contai-upload.jks"
-          keytool -list -keystore "${RUNNER_TEMP}/contai-upload.jks" -storepass "${{ secrets.CONTAI_STORE_PASSWORD }}" -alias "${{ secrets.CONTAI_KEY_ALIAS }}" >/dev/null
+          fail() { echo "::error::$1"; exit 1; }
+
+          [ -n "$CONTAI_KEYSTORE_BASE64" ] || fail "CONTAI_KEYSTORE_BASE64 is empty."
+          [ -n "$CONTAI_STORE_PASSWORD" ] || fail "CONTAI_STORE_PASSWORD is empty."
+          [ -n "$CONTAI_KEY_ALIAS" ] || fail "CONTAI_KEY_ALIAS is empty."
+          [ -n "$CONTAI_KEY_PASSWORD" ] || fail "CONTAI_KEY_PASSWORD is empty."
+
+          KEYSTORE="${RUNNER_TEMP}/contai-upload.jks"
+          printf '%s' "$CONTAI_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > "$KEYSTORE" \
+            || fail "CONTAI_KEYSTORE_BASE64 is not valid Base64."
+          [ -s "$KEYSTORE" ] || fail "Decoded keystore is empty."
+
+          if ! keytool -list -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" >/dev/null 2>&1; then
+            fail "Keystore could not be opened. Check CONTAI_KEYSTORE_BASE64 and CONTAI_STORE_PASSWORD."
+          fi
+
+          if ! keytool -list -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" -alias "$CONTAI_KEY_ALIAS" >/dev/null 2>&1; then
+            fail "Keystore opens, but CONTAI_KEY_ALIAS was not found. Check the alias secret for spelling, spaces or line breaks."
+          fi
+
+          echo "Signing keystore and alias validated without exposing secret values."
 
       - name: Build signed release AAB
         env:
