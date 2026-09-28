@@ -15,9 +15,11 @@ private const val BOOT_NOTIFICATION_PREFS = "contai_notifications"
 
 class AgendaBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_LOCKED_BOOT_COMPLETED) return
 
-        restoreAgendaReminders(context)
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            restoreAgendaReminders(context)
+        }
         requestNotificationListenerRebind(context)
         CaptureWatchdog.schedule(context)
     }
