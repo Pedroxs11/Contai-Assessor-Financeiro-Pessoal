@@ -1,0 +1,93 @@
+name: Upload Contai to Internal Testing
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - recovery-v1.1-beta-apk7
+    paths:
+      - 'app/build.gradle.kts'
+
+permissions:
+  contents: read
+
+jobs:
+  upload-internal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore upload keystore
+        env:
+          CONTAI_KEYSTORE_BASE64: ${{ secrets.CONTAI_KEYSTORE_BASE64 }}
+          CONTAI_STORE_PASSWORD: ${{ secrets.CONTAI_STORE_PASSWORD }}
+          CONTAI_KEY_PASSWORD: ${{ secrets.CONTAI_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+          [ -n "$CONTAI_KEYSTORE_BASE64" ] || fail "CONTAI_KEYSTORE_BASE64 is empty."
+          [ -n "$CONTAI_STORE_PASSWORD" ] || fail "CONTAI_STORE_PASSWORD is empty."
+          [ -n "$CONTAI_KEY_PASSWORD" ] || fail "CONTAI_KEY_PASSWORD is empty."
+
+          KEYSTORE="${RUNNER_TEMP}/contai-upload.jks"
+          printf '%s' "$CONTAI_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > "$KEYSTORE"
+          [ -s "$KEYSTORE" ] || fail "Decoded keystore is empty."
+
+          RESOLVED_ALIAS="$(keytool -J-Duser.language=en -list -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" 2>/dev/null | awk -F',' '/PrivateKeyEntry/{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1}')"
+          ALIAS_COUNT="$(printf '%s\n' "$RESOLVED_ALIAS" | sed '/^$/d' | wc -l | tr -d ' ')"
+          [ "$ALIAS_COUNT" -eq 1 ] || fail "Expected exactly one PrivateKeyEntry in the keystore, found $ALIAS_COUNT."
+          echo "CONTAI_RESOLVED_ALIAS=$RESOLVED_ALIAS" >> "$GITHUB_ENV"
+
+      - name: Build release AAB
+        run: |
+          chmod +x gradlew
+          ./gradlew bundleRelease --stacktrace
+          test -s app/build/outputs/bundle/release/app-release.aab
+
+      - name: Sign final AAB explicitly
+        env:
+          CONTAI_STORE_PASSWORD: ${{ secrets.CONTAI_STORE_PASSWORD }}
+          CONTAI_KEY_PASSWORD: ${{ secrets.CONTAI_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          AAB="app/build/outputs/bundle/release/app-release.aab"
+          KEYSTORE="${RUNNER_TEMP}/contai-upload.jks"
+          jarsigner -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" -keypass "$CONTAI_KEY_PASSWORD" -sigalg SHA256withRSA -digestalg SHA-256 "$AAB" "$CONTAI_RESOLVED_ALIAS"
+          jarsigner -verify -verbose -certs "$AAB" >/dev/null
+          echo "AAB explicitly signed and verified."
+
+      - name: Write Google Play service account
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          [ -n "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" ] || { echo "::error::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is empty."; exit 1; }
+          printf '%s' "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" > "${RUNNER_TEMP}/google-play-service-account.json"
+          python3 -m json.tool "${RUNNER_TEMP}/google-play-service-account.json" >/dev/null
+
+      - name: Upload to Google Play Internal Testing only
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJson: ${{ runner.temp }}/google-play-service-account.json
+          packageName: com.contai.financeiro
+          releaseFiles: app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: draft
+
+      - name: Confirm safety boundary
+        run: |
+          echo "Upload target was restricted to Google Play track: internal"
+          echo "Release status: draft"
+          echo "No production track is configured in this workflow."
