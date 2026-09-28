@@ -138,15 +138,41 @@ class FinanceNotificationListener : NotificationListenerService() {
             .apply()
     }
 
+    private fun isRecentDuplicate(
+        history: JSONArray,
+        packageName: String,
+        title: String,
+        text: String,
+        parsed: ParsedTransaction,
+        now: Long
+    ): Boolean {
+        for (index in history.length() - 1 downTo 0) {
+            val item = history.optJSONObject(index) ?: continue
+            val timestamp = item.optLong("timestamp", 0L)
+            if (timestamp <= 0L || now < timestamp || now - timestamp > 30_000) continue
+
+            val storedAmount = if (item.has("amount")) item.optDouble("amount") else null
+            if (
+                item.optString("package") == packageName &&
+                item.optString("title") == title &&
+                item.optString("text") == text &&
+                item.optString("type") == parsed.type &&
+                storedAmount == parsed.amount
+            ) return true
+        }
+        return false
+    }
+
     private fun saveToHistory(packageName: String, title: String, text: String, parsed: ParsedTransaction): Boolean {
         val prefs = prefs()
         val history = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
-        if (history.length() > 0) {
-            val lastItem = history.getJSONObject(history.length() - 1)
-            val lastTimestamp = lastItem.optLong("timestamp", 0L)
-            val now = System.currentTimeMillis()
-            val lastAmount = if (lastItem.has("amount")) lastItem.optDouble("amount") else null
-            if (lastItem.optString("package") == packageName && lastItem.optString("title") == title && lastItem.optString("text") == text && lastItem.optString("type") == parsed.type && lastAmount == parsed.amount && now - lastTimestamp <= 30_000) return false
+        val now = System.currentTimeMillis()
+        if (isRecentDuplicate(history, packageName, title, text, parsed, now)) {
+            prefs.edit()
+                .putLong("debug_last_duplicate_at", now)
+                .putString("debug_last_duplicate_package", packageName)
+                .apply()
+            return false
         }
 
         val normalizedLearningText = text.lowercase().replace(Regex("""r\$\s*[0-9.]+,[0-9]{2}"""), "r$ valor").replace(Regex("""\s+"""), " ").trim()
