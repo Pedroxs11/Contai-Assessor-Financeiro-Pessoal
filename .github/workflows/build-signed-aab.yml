@@ -49,7 +49,13 @@ jobs:
           fi
 
           if ! keytool -list -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" -alias "$CONTAI_KEY_ALIAS" >/dev/null 2>&1; then
-            fail "Keystore opens, but CONTAI_KEY_ALIAS was not found. Check the alias secret for spelling, spaces or line breaks."
+            ALIAS_COUNT="$(keytool -list -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" 2>/dev/null | grep -c ',.*Entry,' || true)"
+            if [ "$ALIAS_COUNT" -eq 1 ]; then
+              echo "::error::Keystore opens and contains exactly one key entry, but CONTAI_KEY_ALIAS does not match it. Update only CONTAI_KEY_ALIAS with the keystore alias."
+            else
+              echo "::error::Keystore opens, but CONTAI_KEY_ALIAS was not found. The keystore reports $ALIAS_COUNT entries; inspect the alias locally before changing the secret."
+            fi
+            exit 1
           fi
 
           echo "Signing keystore and alias validated without exposing secret values."
