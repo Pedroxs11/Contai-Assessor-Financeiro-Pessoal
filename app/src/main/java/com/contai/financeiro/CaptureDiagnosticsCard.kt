@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import androidx.compose.foundation.layout.*
@@ -47,6 +48,8 @@ fun CaptureDiagnosticsCard() {
     val watchdogLastRecoveryAttemptsCompleted = prefs.getInt("watchdog_last_recovery_attempts_completed", 0)
     val aliveRecently = connected && lastAliveAt > 0L && System.currentTimeMillis() - lastAliveAt <= 45_000L
     val isXiaomiFamily = Build.MANUFACTURER.contains("xiaomi", true) || Build.BRAND.contains("xiaomi", true) || Build.BRAND.contains("redmi", true) || Build.BRAND.contains("poco", true)
+    val powerManager = context.getSystemService(PowerManager::class.java)
+    val batteryUnrestricted = powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
     var recoveryFeedback by remember { mutableStateOf<String?>(null) }
     var showRecentEvents by remember { mutableStateOf(false) }
 
@@ -163,10 +166,36 @@ fun CaptureDiagnosticsCard() {
             }
 
             if (isXiaomiFamily) {
-                Text("Neste aparelho, o sistema pode encerrar apps em segundo plano mesmo com a permissão ativa. Se a captura parar ao fechar o app, libere o Contai das restrições de bateria/autoinicialização.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "Neste aparelho, o sistema pode encerrar apps em segundo plano mesmo com o acesso às notificações ativo.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Restrição de bateria: ${if (batteryUnrestricted) "sem otimização do Android" else "otimização ativa"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (batteryUnrestricted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                )
                 OutlinedButton(onClick = {
                     runCatching {
-                        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        context.startActivity(
+                            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }.recoverCatching {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                }, modifier = Modifier.fillMaxWidth()) { Text("Abrir otimização de bateria") }
+
+                OutlinedButton(onClick = {
+                    runCatching {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
                     }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Abrir configurações do app") }
             }
