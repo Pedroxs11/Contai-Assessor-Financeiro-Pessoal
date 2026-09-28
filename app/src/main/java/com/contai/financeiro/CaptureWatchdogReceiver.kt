@@ -69,6 +69,8 @@ class CaptureWatchdogReceiver : BroadcastReceiver() {
                         .putLong("listener_lifecycle_at", now)
                         .putLong("watchdog_last_rebind_at", now)
                         .putInt("watchdog_recovery_attempts", attempts)
+                        .putString("watchdog_last_state", if (useFastRecovery) "RECOVERY_FAST" else "RECOVERY_BACKOFF")
+                        .putLong("watchdog_last_check_at", now)
                         .apply()
 
                     if (Build.VERSION.SDK_INT >= 34) {
@@ -91,9 +93,16 @@ class CaptureWatchdogReceiver : BroadcastReceiver() {
                 } else {
                     prefs.edit()
                         .putLong("watchdog_last_check_at", now)
+                        .putString("watchdog_last_state", "HEALTHY")
                         .putInt("watchdog_recovery_attempts", 0)
                         .apply()
                 }
+            } else {
+                context.getSharedPreferences(WATCHDOG_PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putLong("watchdog_last_check_at", System.currentTimeMillis())
+                    .putString("watchdog_last_state", "PERMISSION_DISABLED")
+                    .apply()
             }
         } finally {
             CaptureWatchdog.schedule(context, nextDelayMs)
