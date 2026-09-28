@@ -84,4 +84,29 @@ class FinancialParserTest {
         assertNull(result.amount)
         assertEquals("NAO_FINANCEIRA", result.classification)
     }
+    @Test
+    fun `pix recebido com texto multiline do Android preserva valor e direcao`() {
+        val result = FinancialParser.parse(
+            packageName = "com.nu.production",
+            title = "Pix recebido",
+            text = "Transferência recebida • Você recebeu\nR$ 47,35\nde Maria"
+        )
+
+        assertEquals(47.35, result.amount!!, 0.001)
+        assertEquals("ENTRADA", result.type)
+        assertEquals("CONFIRMADA", result.classification)
+    }
+
+    @Test
+    fun `pix enviado duplicado no texto agregado continua com um unico valor valido`() {
+        val result = FinancialParser.parse(
+            packageName = "com.itau.app",
+            title = "Pix enviado",
+            text = "Pix enviado R$ 18,90 • Pix enviado R$ 18,90"
+        )
+
+        assertEquals(18.90, result.amount!!, 0.001)
+        assertEquals("DESPESA", result.type)
+        assertEquals("CONFIRMADA", result.classification)
+    }
 }
