@@ -47,8 +47,6 @@ jobs:
             fail "Keystore could not be opened. Check CONTAI_KEYSTORE_BASE64 and CONTAI_STORE_PASSWORD."
           fi
 
-          # Resolve the only PrivateKeyEntry alias directly from the keystore.
-          # The alias itself is not secret, but we do not print it to the log.
           RESOLVED_ALIAS="$(keytool -J-Duser.language=en -list -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" 2>/dev/null \
             | awk -F',' '/PrivateKeyEntry/{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1}')"
           ALIAS_COUNT="$(printf '%s\n' "$RESOLVED_ALIAS" | sed '/^$/d' | wc -l | tr -d ' ')"
@@ -67,13 +65,46 @@ jobs:
           chmod +x gradlew
           ./gradlew bundleRelease --stacktrace
 
-      - name: Verify AAB exists
+      - name: Validate AAB package, version and upload certificate
+        env:
+          CONTAI_STORE_PASSWORD: ${{ secrets.CONTAI_STORE_PASSWORD }}
         run: |
           set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+
           AAB="app/build/outputs/bundle/release/app-release.aab"
-          test -s "$AAB"
-          echo "Signed AAB generated successfully."
-          ls -lh "$AAB"
+          KEYSTORE="${RUNNER_TEMP}/contai-upload.jks"
+          test -s "$AAB" || fail "Release AAB was not generated."
+
+          python3 - <<'PY'
+          import re, zipfile, sys
+          aab = "app/build/outputs/bundle/release/app-release.aab"
+          with zipfile.ZipFile(aab) as z:
+              names = set(z.namelist())
+              required = {"base/manifest/AndroidManifest.xml", "META-INF/MANIFEST.MF"}
+              missing = sorted(required - names)
+              if missing:
+                  print("::error::AAB structure is invalid; missing: " + ", ".join(missing))
+                  sys.exit(1)
+          print("AAB ZIP structure validated.")
+          PY
+
+          EXPECTED_PACKAGE="$(grep -RhoE 'namespace[[:space:]]*=?[[:space:]]*["'\'']com\.contai\.financeiro["'\'']|applicationId[[:space:]]+["'\'']com\.contai\.financeiro["'\'']' app/build.gradle* 2>/dev/null | head -1 || true)"
+          [ -n "$EXPECTED_PACKAGE" ] || fail "Expected package com.contai.financeiro was not found in app Gradle configuration."
+
+          VERSION_CODE="$(grep -RhoE 'versionCode[[:space:]]*=?[[:space:]]*[0-9]+' app/build.gradle* 2>/dev/null | head -1 | grep -oE '[0-9]+' || true)"
+          VERSION_NAME="$(grep -RhoE 'versionName[[:space:]]*=?[[:space:]]*["'\''][^"'\'']+["'\'']' app/build.gradle* 2>/dev/null | head -1 | sed -E 's/.*["'\'']([^"'\'']+)["'\''].*/\1/' || true)"
+          [ -n "$VERSION_CODE" ] || fail "versionCode could not be read from app Gradle configuration."
+          [ -n "$VERSION_NAME" ] || fail "versionName could not be read from app Gradle configuration."
+
+          keytool -exportcert -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" -alias "$CONTAI_RESOLVED_ALIAS" -rfc > "${RUNNER_TEMP}/upload-cert.pem"
+          SHA256="$(keytool -printcert -file "${RUNNER_TEMP}/upload-cert.pem" 2>/dev/null | sed -n 's/^[[:space:]]*SHA256: //p' | head -1)"
+          [ -n "$SHA256" ] || fail "Could not calculate upload certificate SHA-256 fingerprint."
+
+          echo "Package: com.contai.financeiro"
+          echo "Version: $VERSION_NAME ($VERSION_CODE)"
+          echo "Upload certificate SHA-256: $SHA256"
+          echo "AAB validation passed."
 
       - name: Upload signed AAB artifact
         uses: actions/upload-artifact@v4
