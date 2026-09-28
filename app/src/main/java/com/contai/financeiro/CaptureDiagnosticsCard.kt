@@ -48,6 +48,7 @@ fun CaptureDiagnosticsCard() {
     val watchdogLastRecoveryAttemptsCompleted = prefs.getInt("watchdog_last_recovery_attempts_completed", 0)
     val aliveRecently = connected && lastAliveAt > 0L && System.currentTimeMillis() - lastAliveAt <= 45_000L
     val isXiaomiFamily = Build.MANUFACTURER.contains("xiaomi", true) || Build.BRAND.contains("xiaomi", true) || Build.BRAND.contains("redmi", true) || Build.BRAND.contains("poco", true)
+    val isSamsungFamily = Build.MANUFACTURER.contains("samsung", true) || Build.BRAND.contains("samsung", true)
     val powerManager = context.getSystemService(PowerManager::class.java)
     val batteryUnrestricted = powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
     var recoveryFeedback by remember { mutableStateOf<String?>(null) }
@@ -198,6 +199,48 @@ fun CaptureDiagnosticsCard() {
                         )
                     }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Abrir configurações do app") }
+            }
+
+            if (isSamsungFamily) {
+                Text(
+                    "Samsung pode colocar o Contai em suspensão ou suspensão profunda e atrasar/interromper a captura em segundo plano.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Para maior estabilidade, mantenha o Contai em “Nunca suspensos” e evite restrição de bateria.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(onClick = {
+                    runCatching {
+                        context.startActivity(
+                            Intent("com.samsung.android.sm.ACTION_OPEN_CHECKABLE_LISTACTIVITY")
+                                .setPackage("com.samsung.android.lool")
+                                .putExtra("activity_type", 2)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }.recoverCatching {
+                        context.startActivity(
+                            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }.recoverCatching {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                }, modifier = Modifier.fillMaxWidth()) { Text("Abrir “Nunca suspensos”") }
+
+                OutlinedButton(onClick = {
+                    runCatching {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                }, modifier = Modifier.fillMaxWidth()) { Text("Abrir bateria do Contai") }
             }
 
             if (!aliveRecently) {
