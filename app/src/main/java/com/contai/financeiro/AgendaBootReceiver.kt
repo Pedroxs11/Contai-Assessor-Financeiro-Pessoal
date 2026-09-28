@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import android.os.UserManager
 import android.service.notification.NotificationListenerService
 import org.json.JSONArray
 
@@ -72,11 +73,16 @@ class AgendaBootReceiver : BroadcastReceiver() {
 
         if (!listenerEnabled) return
 
-        context.getSharedPreferences(BOOT_NOTIFICATION_PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString("listener_lifecycle_event", "rebindRequestedAfterBoot")
-            .putLong("listener_lifecycle_at", System.currentTimeMillis())
-            .apply()
+        // LOCKED_BOOT_COMPLETED can run before credential-protected storage is available.
+        // Keep the early rebind, but only write normal app preferences after the user is unlocked.
+        val userManager = context.getSystemService(UserManager::class.java)
+        if (userManager?.isUserUnlocked != false) {
+            context.getSharedPreferences(BOOT_NOTIFICATION_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString("listener_lifecycle_event", "rebindRequestedAfterBoot")
+                .putLong("listener_lifecycle_at", System.currentTimeMillis())
+                .apply()
+        }
 
         NotificationListenerService.requestRebind(listenerComponent)
     }
