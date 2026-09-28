@@ -41,6 +41,7 @@ fun CaptureDiagnosticsCard() {
     val lastSavedPackage = prefs.getString("capture_last_saved_package", "").orEmpty()
     val recentEventsJson = prefs.getString("capture_recent_events", "[]") ?: "[]"
     val watchdogRecoveryAttempts = prefs.getInt("watchdog_recovery_attempts", 0)
+    val watchdogState = prefs.getString("watchdog_last_state", "SEM_REGISTRO").orEmpty()
     val watchdogLastRebindAt = prefs.getLong("watchdog_last_rebind_at", 0L)
     val watchdogLastCheckAt = prefs.getLong("watchdog_last_check_at", 0L)
     val watchdogLastRecoveredAt = prefs.getLong("watchdog_last_recovered_at", 0L)
@@ -96,6 +97,14 @@ fun CaptureDiagnosticsCard() {
             Text("4. Último lançamento salvo: ${formattedTime(lastSavedAt)}${if (lastSavedPackage.isNotBlank()) " • $lastSavedPackage" else ""}", style = MaterialTheme.typography.bodySmall)
 
             Text("Último sinal do serviço: ${formattedTime(lastAliveAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val watchdogStateLabel = when (watchdogState) {
+                "HEALTHY" -> "saudável"
+                "RECOVERY_FAST" -> "tentando recuperar"
+                "RECOVERY_BACKOFF" -> "recuperação em espera"
+                "PERMISSION_DISABLED" -> "permissão desativada"
+                else -> "aguardando diagnóstico"
+            }
+            Text("Estado do watchdog: $watchdogStateLabel", style = MaterialTheme.typography.bodySmall, color = if (watchdogState == "RECOVERY_FAST" || watchdogState == "RECOVERY_BACKOFF") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 "Watchdog: ${if (watchdogRecoveryAttempts > 0) "$watchdogRecoveryAttempts tentativa(s) seguida(s) de recuperação" else "sem recuperação pendente"}",
                 style = MaterialTheme.typography.bodySmall,
@@ -112,7 +121,7 @@ fun CaptureDiagnosticsCard() {
                 )
             }
             if (watchdogLastCheckAt > 0L) {
-                Text("Última checagem saudável: ${formattedTime(watchdogLastCheckAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Última checagem do watchdog: ${formattedTime(watchdogLastCheckAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             if (lastNotificationAt > 0L) {
