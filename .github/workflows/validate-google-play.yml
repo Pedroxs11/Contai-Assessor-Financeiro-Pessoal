@@ -1,0 +1,51 @@
+name: Validate Google Play access
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate service account and Google Play API access
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" > "${RUNNER_TEMP}/play-service-account.json"
+          python3 - <<'PY'
+          import json, os
+          p = os.path.join(os.environ["RUNNER_TEMP"], "play-service-account.json")
+          with open(p, encoding="utf-8") as f:
+              data = json.load(f)
+          if data.get("type") != "service_account":
+              raise SystemExit("Secret is not a Google service-account JSON")
+          required = ("client_email", "private_key", "token_uri")
+          missing = [k for k in required if not data.get(k)]
+          if missing:
+              raise SystemExit("Missing required fields: " + ", ".join(missing))
+          print("Service-account JSON structure: OK")
+          PY
+          python3 -m pip install --quiet google-auth requests
+          python3 - <<'PY'
+          import json, os
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import AuthorizedSession
+          p = os.path.join(os.environ["RUNNER_TEMP"], "play-service-account.json")
+          scopes = ["https://www.googleapis.com/auth/androidpublisher"]
+          creds = service_account.Credentials.from_service_account_file(p, scopes=scopes)
+          session = AuthorizedSession(creds)
+          url = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/com.contai.financeiro/edits"
+          r = session.post(url, json={}, timeout=30)
+          if r.status_code not in (200, 201):
+              raise SystemExit(f"Google Play API validation failed: HTTP {r.status_code} {r.text[:500]}")
+          edit_id = r.json().get("id")
+          if not edit_id:
+              raise SystemExit("Google Play API responded without an edit id")
+          session.delete(url + "/" + edit_id, timeout=30)
+          print("Google Play Developer API access: OK (temporary edit deleted)")
+          PY
