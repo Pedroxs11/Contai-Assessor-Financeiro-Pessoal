@@ -10,7 +10,7 @@ android {
     defaultConfig {
         applicationId = "com.contai.financeiro"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 8
         versionName = "1.2-beta"
     }
