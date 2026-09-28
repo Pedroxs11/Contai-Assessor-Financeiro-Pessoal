@@ -17,6 +17,7 @@ private const val WATCHDOG_REQUEST_CODE = 7319
 private const val WATCHDOG_INTERVAL_MS = 5 * 60 * 1000L
 private const val WATCHDOG_RECHECK_AFTER_RECOVERY_MS = 60 * 1000L
 private const val WATCHDOG_STALE_AFTER_MS = 90 * 1000L
+private const val WATCHDOG_FAST_RECOVERY_LIMIT = 3
 
 object CaptureWatchdog {
     fun schedule(context: Context, delayMs: Long = WATCHDOG_INTERVAL_MS) {
@@ -62,6 +63,7 @@ class CaptureWatchdogReceiver : BroadcastReceiver() {
 
                 if (stale) {
                     val attempts = prefs.getInt("watchdog_recovery_attempts", 0) + 1
+                    val useFastRecovery = attempts <= WATCHDOG_FAST_RECOVERY_LIMIT
                     prefs.edit()
                         .putString("listener_lifecycle_event", "watchdogRecoveryCycleRequested")
                         .putLong("listener_lifecycle_at", now)
@@ -80,7 +82,12 @@ class CaptureWatchdogReceiver : BroadcastReceiver() {
 
                     // Depois de uma recuperação, verifica novamente mais cedo para não esperar
                     // outros cinco minutos caso o fabricante mantenha o listener suspenso.
-                    nextDelayMs = WATCHDOG_RECHECK_AFTER_RECOVERY_MS
+                    nextDelayMs = if (useFastRecovery) {
+                        WATCHDOG_RECHECK_AFTER_RECOVERY_MS
+                    } else {
+                        // Evita ciclo agressivo infinito em OEMs que mantêm o listener suspenso.
+                        WATCHDOG_INTERVAL_MS
+                    }
                 } else {
                     prefs.edit()
                         .putLong("watchdog_last_check_at", now)
