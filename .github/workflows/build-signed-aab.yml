@@ -36,7 +36,6 @@ jobs:
 
           [ -n "$CONTAI_KEYSTORE_BASE64" ] || fail "CONTAI_KEYSTORE_BASE64 is empty."
           [ -n "$CONTAI_STORE_PASSWORD" ] || fail "CONTAI_STORE_PASSWORD is empty."
-          [ -n "$CONTAI_KEY_ALIAS" ] || fail "CONTAI_KEY_ALIAS is empty."
           [ -n "$CONTAI_KEY_PASSWORD" ] || fail "CONTAI_KEY_PASSWORD is empty."
 
           KEYSTORE="${RUNNER_TEMP}/contai-upload.jks"
@@ -48,23 +47,21 @@ jobs:
             fail "Keystore could not be opened. Check CONTAI_KEYSTORE_BASE64 and CONTAI_STORE_PASSWORD."
           fi
 
-          if ! keytool -list -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" -alias "$CONTAI_KEY_ALIAS" >/dev/null 2>&1; then
-            ALIAS_COUNT="$(keytool -list -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" 2>/dev/null | grep -c ',.*Entry,' || true)"
-            if [ "$ALIAS_COUNT" -eq 1 ]; then
-              echo "::error::Keystore opens and contains exactly one key entry, but CONTAI_KEY_ALIAS does not match it. Update only CONTAI_KEY_ALIAS with the keystore alias."
-            else
-              echo "::error::Keystore opens, but CONTAI_KEY_ALIAS was not found. The keystore reports $ALIAS_COUNT entries; inspect the alias locally before changing the secret."
-            fi
-            exit 1
-          fi
+          # Resolve the only PrivateKeyEntry alias directly from the keystore.
+          # The alias itself is not secret, but we do not print it to the log.
+          RESOLVED_ALIAS="$(keytool -J-Duser.language=en -list -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" 2>/dev/null \
+            | awk -F',' '/PrivateKeyEntry/{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1}')"
+          ALIAS_COUNT="$(printf '%s\n' "$RESOLVED_ALIAS" | sed '/^$/d' | wc -l | tr -d ' ')"
+          [ "$ALIAS_COUNT" -eq 1 ] || fail "Expected exactly one PrivateKeyEntry in the keystore, found $ALIAS_COUNT."
 
-          echo "Signing keystore and alias validated without exposing secret values."
+          echo "CONTAI_RESOLVED_ALIAS=$RESOLVED_ALIAS" >> "$GITHUB_ENV"
+          echo "Signing keystore validated and its single key alias resolved automatically."
 
       - name: Build signed release AAB
         env:
           ORG_GRADLE_PROJECT_android.injected.signing.store.file: ${{ runner.temp }}/contai-upload.jks
           ORG_GRADLE_PROJECT_android.injected.signing.store.password: ${{ secrets.CONTAI_STORE_PASSWORD }}
-          ORG_GRADLE_PROJECT_android.injected.signing.key.alias: ${{ secrets.CONTAI_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_android.injected.signing.key.alias: ${{ env.CONTAI_RESOLVED_ALIAS }}
           ORG_GRADLE_PROJECT_android.injected.signing.key.password: ${{ secrets.CONTAI_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
