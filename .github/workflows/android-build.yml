@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - dev/**
+      - recovery/**
   pull_request:
     branches:
       - main
@@ -26,6 +27,9 @@ jobs:
 
       - name: Make Gradle executable
         run: chmod +x gradlew
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest
 
       - name: Build debug APK
         run: ./gradlew assembleDebug
