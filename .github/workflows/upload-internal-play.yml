@@ -40,22 +40,28 @@ jobs:
           printf '%s' "$CONTAI_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > "$KEYSTORE"
           [ -s "$KEYSTORE" ] || fail "Decoded keystore is empty."
 
-          RESOLVED_ALIAS="$(keytool -J-Duser.language=en -list -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" 2>/dev/null \
-            | awk -F',' '/PrivateKeyEntry/{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1}')"
+          RESOLVED_ALIAS="$(keytool -J-Duser.language=en -list -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" 2>/dev/null | awk -F',' '/PrivateKeyEntry/{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1}')"
           ALIAS_COUNT="$(printf '%s\n' "$RESOLVED_ALIAS" | sed '/^$/d' | wc -l | tr -d ' ')"
           [ "$ALIAS_COUNT" -eq 1 ] || fail "Expected exactly one PrivateKeyEntry in the keystore, found $ALIAS_COUNT."
           echo "CONTAI_RESOLVED_ALIAS=$RESOLVED_ALIAS" >> "$GITHUB_ENV"
 
-      - name: Build signed release AAB
-        env:
-          ORG_GRADLE_PROJECT_android.injected.signing.store.file: ${{ runner.temp }}/contai-upload.jks
-          ORG_GRADLE_PROJECT_android.injected.signing.store.password: ${{ secrets.CONTAI_STORE_PASSWORD }}
-          ORG_GRADLE_PROJECT_android.injected.signing.key.alias: ${{ env.CONTAI_RESOLVED_ALIAS }}
-          ORG_GRADLE_PROJECT_android.injected.signing.key.password: ${{ secrets.CONTAI_KEY_PASSWORD }}
+      - name: Build release AAB
         run: |
           chmod +x gradlew
           ./gradlew bundleRelease --stacktrace
           test -s app/build/outputs/bundle/release/app-release.aab
+
+      - name: Sign final AAB explicitly
+        env:
+          CONTAI_STORE_PASSWORD: ${{ secrets.CONTAI_STORE_PASSWORD }}
+          CONTAI_KEY_PASSWORD: ${{ secrets.CONTAI_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          AAB="app/build/outputs/bundle/release/app-release.aab"
+          KEYSTORE="${RUNNER_TEMP}/contai-upload.jks"
+          jarsigner -keystore "$KEYSTORE" -storepass "$CONTAI_STORE_PASSWORD" -keypass "$CONTAI_KEY_PASSWORD" -sigalg SHA256withRSA -digestalg SHA-256 "$AAB" "$CONTAI_RESOLVED_ALIAS"
+          jarsigner -verify -verbose -certs "$AAB" >/dev/null
+          echo "AAB explicitly signed and verified."
 
       - name: Write Google Play service account
         env:
@@ -65,16 +71,6 @@ jobs:
           [ -n "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" ] || { echo "::error::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is empty."; exit 1; }
           printf '%s' "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" > "${RUNNER_TEMP}/google-play-service-account.json"
           python3 -m json.tool "${RUNNER_TEMP}/google-play-service-account.json" >/dev/null
-
-      - name: Verify AAB signature before upload
-        run: |
-          set -euo pipefail
-          AAB="app/build/outputs/bundle/release/app-release.aab"
-          jarsigner -verify -verbose -certs "$AAB" >/dev/null 2>&1 || {
-            echo "::error::Generated AAB is not JAR-signed."
-            exit 1
-          }
-          echo "AAB JAR signature verified."
 
       - name: Upload to Google Play Internal Testing only
         uses: r0adkll/upload-google-play@v1
