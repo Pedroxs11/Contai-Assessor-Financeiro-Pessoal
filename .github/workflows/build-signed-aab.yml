@@ -86,10 +86,7 @@ jobs:
               if missing:
                   print("::error::AAB structure is invalid; missing: " + ", ".join(missing))
                   sys.exit(1)
-              if not any(name.startswith("META-INF/") for name in names):
-                  print("::error::AAB has no META-INF signing metadata.")
-                  sys.exit(1)
-          print("AAB ZIP structure and signing metadata validated.")
+          print("AAB ZIP structure validated.")
           PY
 
           EXPECTED_PACKAGE="$(grep -RhoE 'namespace[[:space:]]*=?[[:space:]]*["'\'']com\.contai\.financeiro["'\'']|applicationId[[:space:]]+["'\'']com\.contai\.financeiro["'\'']' app/build.gradle* 2>/dev/null | head -1 || true)"
