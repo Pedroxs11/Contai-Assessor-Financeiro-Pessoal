@@ -141,12 +141,28 @@ class FinanceNotificationListener : NotificationListenerService() {
     private fun saveToHistory(packageName: String, title: String, text: String, parsed: ParsedTransaction): Boolean {
         val prefs = prefs()
         val history = JSONArray(prefs.getString("transaction_history", "[]") ?: "[]")
-        if (history.length() > 0) {
-            val lastItem = history.getJSONObject(history.length() - 1)
-            val lastTimestamp = lastItem.optLong("timestamp", 0L)
-            val now = System.currentTimeMillis()
-            val lastAmount = if (lastItem.has("amount")) lastItem.optDouble("amount") else null
-            if (lastItem.optString("package") == packageName && lastItem.optString("title") == title && lastItem.optString("text") == text && lastItem.optString("type") == parsed.type && lastAmount == parsed.amount && now - lastTimestamp <= 30_000) return false
+        val now = System.currentTimeMillis()
+        // OEMs can emit the same financial notification more than once and
+        // another event may arrive between the duplicates. Inspect all recent
+        // entries and do not assume imported/restored history is ordered.
+        for (index in history.length() - 1 downTo 0) {
+            val item = history.optJSONObject(index) ?: continue
+            val timestamp = item.optLong("timestamp", 0L)
+            if (timestamp <= 0L || now < timestamp || now - timestamp > 30_000) continue
+            val storedAmount = if (item.has("amount")) item.optDouble("amount") else null
+            if (
+                item.optString("package") == packageName &&
+                item.optString("title") == title &&
+                item.optString("text") == text &&
+                item.optString("type") == parsed.type &&
+                storedAmount == parsed.amount
+            ) {
+                prefs.edit()
+                    .putLong("debug_last_duplicate_at", now)
+                    .putString("debug_last_duplicate_package", packageName)
+                    .apply()
+                return false
+            }
         }
 
         val normalizedLearningText = text.lowercase().replace(Regex("""r\$\s*[0-9.]+,[0-9]{2}"""), "r$ valor").replace(Regex("""\s+"""), " ").trim()
@@ -154,7 +170,6 @@ class FinanceNotificationListener : NotificationListenerService() {
         val learnedParts = prefs.getString("learned_$learningKey", null)?.split("|", limit = 2)
         val finalType = learnedParts?.getOrNull(0) ?: parsed.type
         val category = learnedParts?.getOrNull(1) ?: when (finalType) { "ENTRADA" -> "Receitas"; "DESPESA" -> "Outros"; else -> "Não categorizado" }
-        val now = System.currentTimeMillis()
         val item = JSONObject().put("timestamp", now).put("movementTimestamp", now).put("package", packageName).put("title", title).put("text", text)
             .put("type", finalType).put("category", category).put("confidence", parsed.confidence).put("classification", parsed.classification).put("investmentType", parsed.investmentType)
         if (parsed.amount != null) item.put("amount", parsed.amount)
