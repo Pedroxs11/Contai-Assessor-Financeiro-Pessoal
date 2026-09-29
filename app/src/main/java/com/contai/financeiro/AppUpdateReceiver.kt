@@ -9,7 +9,14 @@ import android.service.notification.NotificationListenerService
 class AppUpdateReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent?) {
-        if (intent?.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+        val shouldRequestRebind = when (intent?.action) {
+            Intent.ACTION_MY_PACKAGE_REPLACED,
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_LOCKED_BOOT_COMPLETED -> true
+            else -> false
+        }
+
+        if (shouldRequestRebind) {
             NotificationListenerService.requestRebind(
                 ComponentName(
                     context,
