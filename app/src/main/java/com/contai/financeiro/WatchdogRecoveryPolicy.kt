@@ -11,6 +11,9 @@ internal data class WatchdogRecoveryDecision(
 )
 
 internal object WatchdogRecoveryPolicy {
+    fun isStale(now: Long, lastAliveAt: Long, staleAfterMs: Long): Boolean =
+        lastAliveAt <= 0L || lastAliveAt > now || now - lastAliveAt > staleAfterMs
+
     fun forStale(previousAttempts: Int): WatchdogRecoveryDecision {
         val attempts = previousAttempts.coerceAtLeast(0) + 1
         val fast = attempts <= WATCHDOG_FAST_RECOVERY_LIMIT
