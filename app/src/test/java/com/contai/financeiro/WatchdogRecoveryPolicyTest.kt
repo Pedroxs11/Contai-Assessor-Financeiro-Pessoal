@@ -31,4 +31,23 @@ class WatchdogRecoveryPolicyTest {
         assertEquals("HEALTHY", decision.state)
         assertEquals(WATCHDOG_NORMAL_INTERVAL_MS, decision.nextDelayMs)
     }
+    @Test
+    fun `heartbeat inexistente e considerado stale`() {
+        assertEquals(true, WatchdogRecoveryPolicy.isStale(100_000L, 0L, 90_000L))
+    }
+
+    @Test
+    fun `heartbeat recente permanece saudavel`() {
+        assertEquals(false, WatchdogRecoveryPolicy.isStale(100_000L, 20_000L, 90_000L))
+    }
+
+    @Test
+    fun `heartbeat antigo e considerado stale`() {
+        assertEquals(true, WatchdogRecoveryPolicy.isStale(100_000L, 9_999L, 90_000L))
+    }
+
+    @Test
+    fun `heartbeat no futuro e considerado stale apos mudanca de relogio`() {
+        assertEquals(true, WatchdogRecoveryPolicy.isStale(100_000L, 100_001L, 90_000L))
+    }
 }
