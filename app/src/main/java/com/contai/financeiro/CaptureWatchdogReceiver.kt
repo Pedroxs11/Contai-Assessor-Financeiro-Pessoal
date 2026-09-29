@@ -56,7 +56,7 @@ class CaptureWatchdogReceiver : BroadcastReceiver() {
                 val prefs = context.getSharedPreferences(WATCHDOG_PREFS, Context.MODE_PRIVATE)
                 val now = System.currentTimeMillis()
                 val lastAliveAt = prefs.getLong("listener_last_alive_at", 0L)
-                val stale = lastAliveAt == 0L || now - lastAliveAt > WATCHDOG_STALE_AFTER_MS
+                val stale = WatchdogRecoveryPolicy.isStale(now, lastAliveAt, WATCHDOG_STALE_AFTER_MS)
 
                 if (stale) {
                     val decision = WatchdogRecoveryPolicy.forStale(prefs.getInt("watchdog_recovery_attempts", 0))
