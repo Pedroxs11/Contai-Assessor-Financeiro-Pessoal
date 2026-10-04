@@ -84,6 +84,7 @@ class FinancialParserTest {
         assertNull(result.amount)
         assertEquals("NAO_FINANCEIRA", result.classification)
     }
+
     @Test
     fun `pix recebido com texto multiline do Android preserva valor e direcao`() {
         val result = FinancialParser.parse(
@@ -107,6 +108,20 @@ class FinancialParserTest {
 
         assertEquals(18.90, result.amount!!, 0.001)
         assertEquals("DESPESA", result.type)
+        assertEquals("CONFIRMADA", result.classification)
+    }
+
+    @Test
+    fun `dividendo recebido identifica entrada de investimento`() {
+        val result = FinancialParser.parse(
+            packageName = "com.nu.production",
+            title = "Rendimento de dividendos",
+            text = "Você recebeu R$ 32,45 em dividendos"
+        )
+
+        assertEquals(32.45, result.amount!!, 0.001)
+        assertEquals("ENTRADA", result.type)
+        assertEquals("DIVIDENDO", result.investmentType)
         assertEquals("CONFIRMADA", result.classification)
     }
 }
