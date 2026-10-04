@@ -88,7 +88,7 @@ object FinancialParser {
         }
 
         val classification = when {
-            hasPromoWords -> "NAO_FINANCEIRA"
+            hasPromoWords && !hasExplicitFinancialSignal -> "NAO_FINANCEIRA"
             isTrustedFinancialApp && amount != null && type != "NAO_IDENTIFICADO" -> "CONFIRMADA"
             amount != null -> "POSSIVEL"
             else -> "NAO_FINANCEIRA"
