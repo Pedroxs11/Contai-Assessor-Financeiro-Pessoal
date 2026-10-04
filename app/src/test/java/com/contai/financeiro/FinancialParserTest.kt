@@ -112,6 +112,20 @@ class FinancialParserTest {
     }
 
     @Test
+    fun `notificacao agregada com promocao nao descarta pix recebido`() {
+        val result = FinancialParser.parse(
+            packageName = "com.whatsapp",
+            title = "WhatsApp",
+            text = "4346 mensagens de 53 conversas • Pedro Henrique: Santander Pix recebido Valor: R$ 50,00 • Pedro Henrique: Compra realizada Mercado Paraná Valor: R$ 30,00 • #23 PROMO & CUPONS"
+        )
+
+        assertEquals(50.0, result.amount!!, 0.001)
+        assertEquals("ENTRADA", result.type)
+        assertEquals("POSSIVEL", result.classification)
+        assertEquals(80, result.confidence)
+    }
+
+    @Test
     fun `dividendo recebido identifica entrada de investimento`() {
         val result = FinancialParser.parse(
             packageName = "com.nu.production",
