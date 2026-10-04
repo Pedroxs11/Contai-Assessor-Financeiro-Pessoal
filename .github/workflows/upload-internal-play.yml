@@ -1,6 +1,9 @@
 name: Upload Contai to Internal Testing
 
 on:
+  push:
+    branches:
+      - recovery/v1-1-beta-play7
   workflow_dispatch:
 
 permissions:
