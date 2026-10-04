@@ -126,6 +126,19 @@ class FinancialParserTest {
     }
 
     @Test
+    fun `transferencia para conta 99Pay vira entrada possivel`() {
+        val result = FinancialParser.parse(
+            packageName = "com.example.99",
+            title = "Aviso transferência",
+            text = "Valquíria Oliveira Gomes transferiu R$0,01 para sua conta 99Pay às 04/10/26 19:02. Confira seu saldo"
+        )
+
+        assertEquals(0.01, result.amount!!, 0.001)
+        assertEquals("ENTRADA", result.type)
+        assertEquals("POSSIVEL", result.classification)
+    }
+
+    @Test
     fun `dividendo recebido identifica entrada de investimento`() {
         val result = FinancialParser.parse(
             packageName = "com.nu.production",
