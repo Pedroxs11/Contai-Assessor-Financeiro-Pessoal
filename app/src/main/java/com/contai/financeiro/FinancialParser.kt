@@ -73,8 +73,13 @@ object FinancialParser {
             else -> "NAO_IDENTIFICADO"
         }
 
+        // Notificações agregadas (especialmente WhatsApp) podem conter uma
+        // promoção e, ao mesmo tempo, uma transação financeira real. A presença
+        // de um sinal financeiro explícito não deve ser anulada pela promoção.
+        val hasExplicitFinancialSignal = amount != null && type != "NAO_IDENTIFICADO"
+
         val confidence = when {
-            hasPromoWords -> 10
+            hasPromoWords && !hasExplicitFinancialSignal -> 10
             isTrustedFinancialApp && amount != null && type != "NAO_IDENTIFICADO" -> 95
             amount != null && type != "NAO_IDENTIFICADO" -> 80
             isTrustedFinancialApp && amount != null -> 70
