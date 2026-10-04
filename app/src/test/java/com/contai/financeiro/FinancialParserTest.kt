@@ -124,4 +124,17 @@ class FinancialParserTest {
         assertEquals("DIVIDENDO", result.investmentType)
         assertEquals("CONFIRMADA", result.classification)
     }
+    @Test
+    fun `valor com espaco unicode antes do numero continua sendo extraido`() {
+        val result = FinancialParser.parse(
+            packageName = "com.nu.production",
+            title = "Pix recebido",
+            text = "Você recebeu R$\u00A01\u202F234,56"
+        )
+
+        assertEquals(1234.56, result.amount!!, 0.001)
+        assertEquals("ENTRADA", result.type)
+        assertEquals("CONFIRMADA", result.classification)
+    }
+
 }
