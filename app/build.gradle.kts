@@ -22,7 +22,7 @@ android {
         applicationId = "com.contai.financeiro"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
+        versionCode = System.getenv("CONTAI_VERSION_CODE")?.toIntOrNull() ?: 10
         versionName = "1.1-beta"
     }
 
