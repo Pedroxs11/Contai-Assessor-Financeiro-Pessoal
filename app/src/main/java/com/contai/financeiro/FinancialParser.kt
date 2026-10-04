@@ -49,7 +49,7 @@ object FinancialParser {
             "pix caiu", "pix recebido com sucesso", "recebido", "depósito", "deposito",
             "crédito recebido", "credito recebido", "transferência recebida", "transferencia recebida",
             "recebemos sua transferência", "recebemos sua transferencia", "valor creditado",
-            "entrou na sua conta", "creditado em sua conta"
+            "entrou na sua conta", "creditado em sua conta", "para sua conta 99pay"
         )
 
         val investmentType = when {
