@@ -12,8 +12,8 @@ data class ParsedTransaction(
 object FinancialParser {
 
     private val amountPatterns = listOf(
-        Regex("""R\$\s*([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2})""", RegexOption.IGNORE_CASE),
-        Regex("""R\$\s*([0-9]+,[0-9]{2})""", RegexOption.IGNORE_CASE),
+        Regex("""R\$[\s\u00A0\u202F]*([0-9]{1,3}(?:[.\u00A0\u202F][0-9]{3})*,[0-9]{2})""", RegexOption.IGNORE_CASE),
+        Regex("""R\$[\s\u00A0\u202F]*([0-9]+,[0-9]{2})""", RegexOption.IGNORE_CASE),
         Regex("""(?:valor|recebeu|recebido|enviado|pagamento|pix)\D{0,20}([0-9]+,[0-9]{2})""", RegexOption.IGNORE_CASE)
     )
 
@@ -21,7 +21,7 @@ object FinancialParser {
         val raw = amountPatterns.firstNotNullOfOrNull { regex ->
             regex.find(content)?.groupValues?.getOrNull(1)
         } ?: return null
-        return raw.replace(".", "").replace(",", ".").toDoubleOrNull()
+        return raw.replace(".", "").replace("\u00A0", "").replace("\u202F", "").replace(",", ".").toDoubleOrNull()
     }
 
     fun parse(packageName: String, title: String, text: String): ParsedTransaction {
