@@ -33,7 +33,7 @@ object FinancialParser {
         val trustedFinancialPackages = listOf(
             "santander", "nubank", "com.nu.production", "br.com.digio.uber",
             "itau", "itaú", "bradesco", "inter", "mercadopago", "mercado pago",
-            "picpay", "caixa", "bancodobrasil", "banco do brasil", "c6", "neon"
+            "picpay", "caixa", "bancodobrasil", "banco do brasil", "c6", "neon", "br.com.uol.ps.myaccount", "pagbank"
         )
         val isTrustedFinancialApp = trustedFinancialPackages.any { packageLower.contains(it) }
 
