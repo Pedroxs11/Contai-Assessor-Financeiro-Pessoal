@@ -139,6 +139,34 @@ class FinancialParserTest {
     }
 
     @Test
+    fun `pix recebido do PagBank vira entrada confirmada`() {
+        val result = FinancialParser.parse(
+            packageName = "br.com.uol.ps.myaccount",
+            title = "Pix recebido",
+            text = "Você recebeu R$ 75,90 via Pix"
+        )
+
+        assertEquals(75.90, result.amount!!, 0.001)
+        assertEquals("ENTRADA", result.type)
+        assertEquals("CONFIRMADA", result.classification)
+        assertEquals(95, result.confidence)
+    }
+
+    @Test
+    fun `pix enviado do PagBank vira despesa confirmada`() {
+        val result = FinancialParser.parse(
+            packageName = "br.com.uol.ps.myaccount",
+            title = "Pix enviado",
+            text = "Pix enviado no valor de R$ 42,50"
+        )
+
+        assertEquals(42.50, result.amount!!, 0.001)
+        assertEquals("DESPESA", result.type)
+        assertEquals("CONFIRMADA", result.classification)
+        assertEquals(95, result.confidence)
+    }
+
+    @Test
     fun `dividendo recebido identifica entrada de investimento`() {
         val result = FinancialParser.parse(
             packageName = "com.nu.production",
