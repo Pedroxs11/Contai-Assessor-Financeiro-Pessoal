@@ -6,6 +6,7 @@ on:
       - main
       - dev/**
       - recovery/**
+      - fix/**
   pull_request:
     branches:
       - main
