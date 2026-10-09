@@ -42,6 +42,14 @@ fun CaptureDiagnosticsCard() {
     val recentEventsJson = prefs.getString("capture_recent_events", "[]") ?: "[]"
     val watchdogRecoveryAttempts = prefs.getInt("watchdog_recovery_attempts", 0)
     val watchdogState = prefs.getString("watchdog_last_state", "SEM_REGISTRO").orEmpty()
+    val listenerComponent = ComponentName(context, FinanceNotificationListener::class.java)
+    val enabledListeners = Settings.Secure.getString(
+        context.contentResolver,
+        "enabled_notification_listeners"
+    ).orEmpty()
+    val notificationPermissionEnabled = enabledListeners.split(':').any {
+        it == listenerComponent.flattenToString()
+    }
     val watchdogLastRebindAt = prefs.getLong("watchdog_last_rebind_at", 0L)
     val watchdogLastCheckAt = prefs.getLong("watchdog_last_check_at", 0L)
     val watchdogLastRecoveredAt = prefs.getLong("watchdog_last_recovered_at", 0L)
@@ -97,14 +105,18 @@ fun CaptureDiagnosticsCard() {
             Text("4. Último lançamento salvo: ${formattedTime(lastSavedAt)}${if (lastSavedPackage.isNotBlank()) " • $lastSavedPackage" else ""}", style = MaterialTheme.typography.bodySmall)
 
             Text("Último sinal do serviço: ${formattedTime(lastAliveAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            val watchdogStateLabel = when (watchdogState) {
-                "HEALTHY" -> "saudável"
-                "RECOVERY_FAST" -> "tentando recuperar"
-                "RECOVERY_BACKOFF" -> "recuperação em espera"
-                "PERMISSION_DISABLED" -> "permissão desativada"
-                else -> "aguardando diagnóstico"
+            val watchdogStateLabel = when {
+                !notificationPermissionEnabled -> "permissão desativada"
+                watchdogState == "RECOVERY_FAST" -> "tentando recuperar"
+                watchdogState == "RECOVERY_BACKOFF" -> "recuperação em espera"
+                watchdogState == "HEALTHY" -> "saudável"
+                else -> "permissão ativa • aguardando checagem"
             }
-            Text("Estado do watchdog: $watchdogStateLabel", style = MaterialTheme.typography.bodySmall, color = if (watchdogState == "RECOVERY_FAST" || watchdogState == "RECOVERY_BACKOFF") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Estado do watchdog: $watchdogStateLabel",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (!notificationPermissionEnabled || watchdogState == "RECOVERY_FAST" || watchdogState == "RECOVERY_BACKOFF") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Text(
                 "Watchdog: ${if (watchdogRecoveryAttempts > 0) "$watchdogRecoveryAttempts tentativa(s) seguida(s) de recuperação" else "sem recuperação pendente"}",
                 style = MaterialTheme.typography.bodySmall,
