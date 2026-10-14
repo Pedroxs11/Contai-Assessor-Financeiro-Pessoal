@@ -11,19 +11,28 @@ data class ParsedTransaction(
 
 object FinancialParser {
 
-    private val amountRegex =
-        Regex("""R\$\s*([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2})""")
+    private val amountRegex = Regex(
+        """R\$[\s\u00A0\u202F]*((?:[0-9]{1,3}(?:[.\s\u00A0\u202F][0-9]{3})+|[0-9]+),[0-9]{2}(?![0-9]))""",
+        RegexOption.IGNORE_CASE
+    )
+    private val labeledAmountRegex = Regex(
+        """(?:valor|recebeu|recebido|enviado|pagamento|pix)\D{0,40}((?:[0-9]{1,3}(?:[.\s\u00A0\u202F][0-9]{3})+|[0-9]+),[0-9]{2}(?![0-9]))""",
+        RegexOption.IGNORE_CASE
+    )
+
+    private fun extractAmount(content: String): Double? {
+        val raw = amountRegex.find(content)?.groupValues?.get(1)
+            ?: labeledAmountRegex.find(content)?.groupValues?.get(1)
+            ?: return null
+        return raw.replace(Regex("""[.\s\u00A0\u202F]"""), "")
+            .replace(",", ".")
+            .toDoubleOrNull()
+    }
 
     fun parse(packageName: String, title: String, text: String): ParsedTransaction {
         val content = "$title $text".trim()
 
-        val amount = amountRegex
-            .find(content)
-            ?.groupValues
-            ?.get(1)
-            ?.replace(".", "")
-            ?.replace(",", ".")
-            ?.toDoubleOrNull()
+        val amount = extractAmount(content)
 
         val lower = content.lowercase()
         val packageLower = packageName.lowercase()
