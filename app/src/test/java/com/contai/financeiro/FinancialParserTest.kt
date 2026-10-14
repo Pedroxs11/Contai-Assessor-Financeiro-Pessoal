@@ -123,4 +123,40 @@ class FinancialParserTest {
         assertEquals("NAO_FINANCEIRA", result.classification)
     }
 
+    @Test
+    fun `valor com tres casas decimais apos R$ e rejeitado sem truncamento`() {
+        val result = FinancialParser.parse(
+            packageName = "com.nu.production",
+            title = "Pix recebido",
+            text = "Você recebeu um Pix de R$ 1.234,567"
+        )
+
+        assertNull(result.amount)
+        assertEquals("NAO_FINANCEIRA", result.classification)
+    }
+
+    @Test
+    fun `valor rotulado sem R$ com tres casas decimais e rejeitado`() {
+        val result = FinancialParser.parse(
+            packageName = "com.nu.production",
+            title = "Pix recebido",
+            text = "Pix recebido no valor de 1234,567"
+        )
+
+        assertNull(result.amount)
+        assertEquals("NAO_FINANCEIRA", result.classification)
+    }
+
+    @Test
+    fun `valor sem agrupamento com duas casas decimais continua reconhecido`() {
+        val result = FinancialParser.parse(
+            packageName = "com.nu.production",
+            title = "Pix recebido",
+            text = "Você recebeu um Pix de R$ 1234,56"
+        )
+
+        assertEquals(1234.56, result.amount!!, 0.001)
+        assertEquals("ENTRADA", result.type)
+        assertEquals("CONFIRMADA", result.classification)
+    }
 }
