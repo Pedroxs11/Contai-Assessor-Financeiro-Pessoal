@@ -12,11 +12,11 @@ data class ParsedTransaction(
 object FinancialParser {
 
     private val amountRegex = Regex(
-        """R\$[\s\u00A0\u202F]*((?:[0-9]{1,3}(?:[.\s\u00A0\u202F][0-9]{3})+|[0-9]+),[0-9]{2})""",
+        """R\$[\s\u00A0\u202F]*((?:[0-9]{1,3}(?:[.\s\u00A0\u202F][0-9]{3})+|[0-9]+),[0-9]{2}(?![0-9]))""",
         RegexOption.IGNORE_CASE
     )
     private val labeledAmountRegex = Regex(
-        """(?:valor|recebeu|recebido|enviado|pagamento|pix)\D{0,40}((?:[0-9]{1,3}(?:[.\s\u00A0\u202F][0-9]{3})+|[0-9]+),[0-9]{2})""",
+        """(?:valor|recebeu|recebido|enviado|pagamento|pix)\D{0,40}((?:[0-9]{1,3}(?:[.\s\u00A0\u202F][0-9]{3})+|[0-9]+),[0-9]{2}(?![0-9]))""",
         RegexOption.IGNORE_CASE
     )
 
