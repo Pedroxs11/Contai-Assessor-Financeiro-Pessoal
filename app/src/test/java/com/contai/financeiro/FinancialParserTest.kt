@@ -84,4 +84,43 @@ class FinancialParserTest {
         assertNull(result.amount)
         assertEquals("NAO_FINANCEIRA", result.classification)
     }
+
+    @Test
+    fun `valor sem R$ com milhar separado por espaco e reconhecido apos rotulo`() {
+        val result = FinancialParser.parse(
+            packageName = "com.nu.production",
+            title = "Pix recebido",
+            text = "Você recebeu valor 1 234,56"
+        )
+
+        assertEquals(1234.56, result.amount!!, 0.001)
+        assertEquals("ENTRADA", result.type)
+        assertEquals("CONFIRMADA", result.classification)
+    }
+
+    @Test
+    fun `valor sem R$ com ponto de milhar e reconhecido apos rotulo`() {
+        val result = FinancialParser.parse(
+            packageName = "com.nu.production",
+            title = "Pix recebido",
+            text = "Pix recebido no valor de 12.345,67"
+        )
+
+        assertEquals(12345.67, result.amount!!, 0.001)
+        assertEquals("ENTRADA", result.type)
+        assertEquals("CONFIRMADA", result.classification)
+    }
+
+    @Test
+    fun `numero decimal sem simbolo nem rotulo financeiro nao e extraido`() {
+        val result = FinancialParser.parse(
+            packageName = "com.app.generico",
+            title = "Aviso",
+            text = "Saldo atualizado em 1234,56"
+        )
+
+        assertNull(result.amount)
+        assertEquals("NAO_FINANCEIRA", result.classification)
+    }
+
 }
