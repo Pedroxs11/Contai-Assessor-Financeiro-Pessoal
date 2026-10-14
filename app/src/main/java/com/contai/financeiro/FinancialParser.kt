@@ -14,7 +14,9 @@ object FinancialParser {
     private val amountPatterns = listOf(
         Regex("""R\$[\s\u00A0\u202F]*([0-9]{1,3}(?:[. \u00A0\u202F][0-9]{3})*,[0-9]{2})""", RegexOption.IGNORE_CASE),
         Regex("""R\$[\s\u00A0\u202F]*([0-9]+,[0-9]{2})""", RegexOption.IGNORE_CASE),
-        Regex("""(?:valor|recebeu|recebido|enviado|pagamento|pix)\D{0,20}([0-9]+,[0-9]{2})""", RegexOption.IGNORE_CASE)
+        // Algumas notificações omitem "R$" e informam o valor após um rótulo.
+        // Aceita separadores de milhar sem capturar apenas os últimos dígitos.
+        Regex("""(?:valor|recebeu|recebido|enviado|pagamento|pix)\D{0,20}((?:[0-9]{1,3}(?:[. \u00A0\u202F][0-9]{3})+|[0-9]+),[0-9]{2})""", RegexOption.IGNORE_CASE)
     )
 
     private fun extractAmount(content: String): Double? {
