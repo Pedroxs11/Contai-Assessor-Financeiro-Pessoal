@@ -11,19 +11,34 @@ data class ParsedTransaction(
 
 object FinancialParser {
 
-    private val amountRegex =
-        Regex("""R\$\s*([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2})""")
+    private val amountRegex = Regex(
+        """R\$[\s\u00A0\u202F]*((?:[0-9]{1,3}(?:[.\s\u00A0\u202F][0-9]{3})+|[0-9]+),[0-9]{2}(?![0-9]))""",
+        RegexOption.IGNORE_CASE
+    )
+    private val labeledAmountRegex = Regex(
+        """(?:valor|recebeu|recebido|enviado|pagamento|pix)\D{0,40}((?:[0-9]{1,3}(?:[.\s\u00A0\u202F][0-9]{3})+|[0-9]+),[0-9]{2}(?![0-9]))""",
+        RegexOption.IGNORE_CASE
+    )
+
+    private fun parseAmount(raw: String): Double? =
+        raw.replace(Regex("""[.\s\u00A0\u202F]"""), "")
+            .replace(",", ".")
+            .toDoubleOrNull()
+
+    private fun extractAmounts(content: String): List<Double> {
+        val currencyAmounts = amountRegex.findAll(content)
+            .mapNotNull { parseAmount(it.groupValues[1]) }
+        val labeledAmounts = labeledAmountRegex.findAll(content)
+            .mapNotNull { parseAmount(it.groupValues[1]) }
+        return (currencyAmounts + labeledAmounts).distinct()
+    }
 
     fun parse(packageName: String, title: String, text: String): ParsedTransaction {
         val content = "$title $text".trim()
 
-        val amount = amountRegex
-            .find(content)
-            ?.groupValues
-            ?.get(1)
-            ?.replace(".", "")
-            ?.replace(",", ".")
-            ?.toDoubleOrNull()
+        val amountCandidates = extractAmounts(content)
+        val hasAmbiguousAmount = amountCandidates.size > 1
+        val amount = amountCandidates.singleOrNull()
 
         val lower = content.lowercase()
         val packageLower = packageName.lowercase()
@@ -117,6 +132,7 @@ object FinancialParser {
 
         val confidence = when {
             hasPromoWords -> 10
+            hasAmbiguousAmount -> 35
             isTrustedFinancialApp && amount != null && type != "NAO_IDENTIFICADO" -> 95
             amount != null && type != "NAO_IDENTIFICADO" -> 80
             amount != null -> 60
@@ -125,6 +141,7 @@ object FinancialParser {
 
         val classification = when {
             hasPromoWords -> "NAO_FINANCEIRA"
+            hasAmbiguousAmount -> "AMBIGUA"
             isTrustedFinancialApp && amount != null && type != "NAO_IDENTIFICADO" -> "CONFIRMADA"
             amount != null && type != "NAO_IDENTIFICADO" -> "POSSIVEL"
             amount != null -> "POSSIVEL"
