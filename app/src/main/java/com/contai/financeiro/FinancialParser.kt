@@ -20,19 +20,25 @@ object FinancialParser {
         RegexOption.IGNORE_CASE
     )
 
-    private fun extractAmount(content: String): Double? {
-        val raw = amountRegex.find(content)?.groupValues?.get(1)
-            ?: labeledAmountRegex.find(content)?.groupValues?.get(1)
-            ?: return null
-        return raw.replace(Regex("""[.\s\u00A0\u202F]"""), "")
+    private fun parseAmount(raw: String): Double? =
+        raw.replace(Regex("""[.\s\u00A0\u202F]"""), "")
             .replace(",", ".")
             .toDoubleOrNull()
+
+    private fun extractAmounts(content: String): List<Double> {
+        val currencyAmounts = amountRegex.findAll(content)
+            .mapNotNull { parseAmount(it.groupValues[1]) }
+        val labeledAmounts = labeledAmountRegex.findAll(content)
+            .mapNotNull { parseAmount(it.groupValues[1]) }
+        return (currencyAmounts + labeledAmounts).distinct()
     }
 
     fun parse(packageName: String, title: String, text: String): ParsedTransaction {
         val content = "$title $text".trim()
 
-        val amount = extractAmount(content)
+        val amountCandidates = extractAmounts(content)
+        val hasAmbiguousAmount = amountCandidates.size > 1
+        val amount = amountCandidates.singleOrNull()
 
         val lower = content.lowercase()
         val packageLower = packageName.lowercase()
@@ -126,6 +132,7 @@ object FinancialParser {
 
         val confidence = when {
             hasPromoWords -> 10
+            hasAmbiguousAmount -> 35
             isTrustedFinancialApp && amount != null && type != "NAO_IDENTIFICADO" -> 95
             amount != null && type != "NAO_IDENTIFICADO" -> 80
             amount != null -> 60
@@ -134,6 +141,7 @@ object FinancialParser {
 
         val classification = when {
             hasPromoWords -> "NAO_FINANCEIRA"
+            hasAmbiguousAmount -> "AMBIGUA"
             isTrustedFinancialApp && amount != null && type != "NAO_IDENTIFICADO" -> "CONFIRMADA"
             amount != null && type != "NAO_IDENTIFICADO" -> "POSSIVEL"
             amount != null -> "POSSIVEL"
