@@ -159,4 +159,15 @@ class FinancialParserTest {
         assertEquals("ENTRADA", result.type)
         assertEquals("CONFIRMADA", result.classification)
     }
+
+    @Test
+    fun `different currency values are marked ambiguous`() {
+        val result = FinancialParser.parse(
+            packageName = "com.nu.production",
+            title = "Saldo R$ 2.000,00",
+            text = "Pix recebido R$ 150,00"
+        )
+        assertNull(result.amount)
+        assertEquals("AMBIGUA", result.classification)
+    }
 }
